@@ -1,4 +1,5 @@
 import os
+import re
 
 import discord
 from dotenv import load_dotenv
@@ -206,6 +207,9 @@ async def on_message(message):
         )
 
         answer = response.choices[0].message.content or ""
+
+        # Xóa thinking tags
+        answer = re.sub(r"<think>.*?</think>", "", answer, flags=re.DOTALL).strip()
 
         print(f"AI: {answer}", flush=True)
 
