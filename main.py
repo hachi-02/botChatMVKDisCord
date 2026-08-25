@@ -187,7 +187,7 @@ async def on_message(message):
         print(f"GỬI AI: {prompt}", flush=True)
 
         response = ai.chat.completions.create(
-            model="gemini-3.6-flash",
+            model="gemini-3.5-flash",
             messages=[
                 {
                     "role": "system",
