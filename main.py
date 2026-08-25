@@ -64,9 +64,9 @@ async def start_web_server():
 
 @bot.event
 async def on_ready():
-    print(f"Bot đã online: {bot.user}")
+    print(f"Bot đã online: {bot.user}", flush=True)
     await start_web_server()
-    print("Web server đã start")
+    print("Web server đã start", flush=True)
 
 
 # =========================
@@ -80,7 +80,8 @@ async def on_message(message):
     print(
         f"NHẬN MESSAGE: "
         f"{message.author}: "
-        f"{message.content}"
+        f"{message.content}",
+        flush=True
     )
 
     # Không trả lời chính mình
@@ -179,7 +180,7 @@ async def on_message(message):
 
     try:
 
-        print(f"GỬI AI: {prompt}")
+        print(f"GỬI AI: {prompt}", flush=True)
 
         response = ai.chat.completions.create(
             model="gemini-3.6-flash",
@@ -202,7 +203,7 @@ async def on_message(message):
 
         answer = response.choices[0].message.content or ""
 
-        print(f"AI: {answer}")
+        print(f"AI: {answer}", flush=True)
 
         # =========================
         # GỬI TRẢ LỜI
@@ -224,7 +225,7 @@ async def on_message(message):
 
     except Exception as e:
 
-        print(f"LỖI AI: {e}")
+        print(f"LỖI AI: {e}", flush=True)
 
         await message.channel.send(
             "Chị Cá bị lỗi khi gọi AI rồi 😭"
