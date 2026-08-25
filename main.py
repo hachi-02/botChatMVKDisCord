@@ -88,6 +88,10 @@ async def on_message(message):
     if message.author == bot.user:
         return
 
+    # Không trả lời tin nhắn riêng (DM)
+    if message.guild is None:
+        return
+
     # =========================
     # KIỂM TRA MENTION BOT
     # =========================
