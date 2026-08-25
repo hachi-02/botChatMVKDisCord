@@ -12,18 +12,18 @@ load_dotenv()
 # =========================
 
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
 # ID role dùng để kích hoạt bot
 ROLE_ID = 1541912537744936983
 
 # =========================
-# GEMINI AI
+# GROQ AI
 # =========================
 
 ai = OpenAI(
-    api_key=GEMINI_API_KEY,
-    base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
+    api_key=GROQ_API_KEY,
+    base_url="https://api.groq.com/openai/v1",
 )
 
 # =========================
@@ -187,7 +187,7 @@ async def on_message(message):
         print(f"GỬI AI: {prompt}", flush=True)
 
         response = ai.chat.completions.create(
-            model="gemini-3.5-flash",
+            model="qwen/qwen3.6-27b",
             messages=[
                 {
                     "role": "system",
