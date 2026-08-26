@@ -410,6 +410,9 @@ async def on_message(message):
             "<:skirkangry:1471089056975687814> khi giận. "
 
             "Chỉ dùng emoji khi thực sự phù hợp, không spam. "
+            "Tuyệt đối KHÔNG dùng LaTeX ($...$, \\frac, \\text, v.v.). "
+            "Viết công thức toán bằng text thuần: dùng ký tự Unicode như ≈, ², ³, √, π, Δ, ÷, ×, ≥, ≤. "
+            "Ví dụ: a ≈ 5.05 m/s², T ≈ 9.69 N. "
             "Trả lời HOÀN TOÀN bằng tiếng Việt. Tuyệt đối không dùng ký tự tiếng Trung hay bất kỳ ngôn ngữ nào khác. "
             "Nếu muốn nói từ tiếng Trung hay tiếng Anh, PHẢI dịch sang tiếng Việt trước khi trả lời."
         )
