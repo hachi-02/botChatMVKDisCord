@@ -338,22 +338,6 @@ async def on_message(message):
     prompt = prompt.strip()
 
     # =========================
-    # XÓA TÊN BOT
-    # =========================
-
-    bot_names = [
-        "chị cá", "chica", "chicá",
-        "chị ca", "cá ơi", "ca ơi",
-    ]
-
-    prompt_lower_check = prompt.lower()
-
-    for name in bot_names:
-        if prompt_lower_check.startswith(name):
-            prompt = prompt[len(name):].strip(" ,.")
-            break
-
-    # =========================
     # TÊN THÀNH VIÊN
     # =========================
 
