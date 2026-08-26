@@ -114,7 +114,7 @@ async def on_message(message):
         answer = clean_ai_response(answer)
 
         # Fix emoji format thiếu <
-        answer = re.sub(r"(?<!<):([a-z]+:\d+>)", r"<:\1", answer)
+        answer = re.sub(r"\[:([a-z]+:\d+)\]", r"<:\1>", answer)
 
         print("AI CLEAN:", repr(answer), flush=True)
 
