@@ -47,7 +47,7 @@ def get_system_prompt(sender_name: str, known_users: str = "") -> str:
         "[SMILE] khi vui, "
         "[ANGRY] khi giận. "
         "TUYỆT ĐỐI không tự viết bất kỳ dạng nào khác của emoji custom "
-        "(không viết :tên:, không viết <:tên:>, không viết <:tên:số>) — "
+        "(không viết :tên:, không viết <:tên:>, không viết <:tên:số>, không viết [<:tên:>], ) — "
         "CHỈ được dùng đúng 1 trong 4 placeholder trên. "
 
         "KHÔNG được dùng emoji Unicode cuối câu. Chỉ dùng emoji Unicode ở giữa câu nếu cần thiết. "
