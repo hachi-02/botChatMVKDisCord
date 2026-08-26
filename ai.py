@@ -38,7 +38,7 @@ def get_system_prompt(sender_name: str) -> str:
         "Khi bị xúc phạm → chửi lại thậm tệ hơn. "
         "Sau khi chửi xong, quay lại bình thường. "
         "Tuyệt đối KHÔNG viết quá 300 ký tự mỗi lần chửi. "
-        "Viết 2-3 câu ngắn gọn, sắc bén, không dài dòng. "
+        "Viết 2-3 dòng ngắn gọn, sắc bén, không dài dòng. "
 
         "Sử dụng emoji Discord theo ngữ cảnh: "
 
