@@ -1,5 +1,6 @@
 import os
 import re
+import asyncio
 
 import discord
 from dotenv import load_dotenv
@@ -40,23 +41,167 @@ bot = discord.Client(intents=intents)
 # MEMORY
 # =========================
 
-chat_history = {}  # {channel_id: [{"role":..., "content":...}]}
+chat_history = {}  # {channel_id: [{"role": ..., "content": ...}]}
+
 MAX_HISTORY = 20
 
 # =========================
-# WEB SERVER (giữ Render không sleep)
+# WEB SERVER
 # =========================
+
+web_runner = None
+
 
 async def health(request):
     return web.Response(text="OK")
 
+
 async def start_web_server():
+    global web_runner
+
+    # Tránh start server nhiều lần khi Discord reconnect
+    if web_runner is not None:
+        return
+
     app = web.Application()
     app.router.add_get("/", health)
-    runner = web.AppRunner(app)
-    await runner.setup()
-    site = web.TCPSite(runner, "0.0.0.0", int(os.getenv("PORT", 8080)))
+
+    web_runner = web.AppRunner(app)
+    await web_runner.setup()
+
+    port = int(os.getenv("PORT", 8080))
+
+    site = web.TCPSite(
+        web_runner,
+        "0.0.0.0",
+        port
+    )
+
     await site.start()
+
+    print(f"Web server đã start tại port {port}", flush=True)
+
+
+# =========================
+# XỬ LÝ THINKING
+# =========================
+
+def clean_ai_response(answer: str) -> str:
+    """
+    Xóa các dạng thinking/reasoning mà model có thể trả về.
+    """
+
+    if not answer:
+        return ""
+
+    # ---------------------------------
+    # <think>...</think>
+    # ---------------------------------
+
+    answer = re.sub(
+        r"<think>.*?</think>",
+        "",
+        answer,
+        flags=re.DOTALL | re.IGNORECASE
+    )
+
+    # ---------------------------------
+    # <reasoning>...</reasoning>
+    # ---------------------------------
+
+    answer = re.sub(
+        r"<reasoning>.*?</reasoning>",
+        "",
+        answer,
+        flags=re.DOTALL | re.IGNORECASE
+    )
+
+    # ---------------------------------
+    # <analysis>...</analysis>
+    # ---------------------------------
+
+    answer = re.sub(
+        r"<analysis>.*?</analysis>",
+        "",
+        answer,
+        flags=re.DOTALL | re.IGNORECASE
+    )
+
+    # ---------------------------------
+    # Trường hợp <think> không đóng
+    # ---------------------------------
+
+    think_match = re.search(
+        r"<think>",
+        answer,
+        flags=re.IGNORECASE
+    )
+
+    if think_match:
+        answer = answer[:think_match.start()]
+
+    # ---------------------------------
+    # Trường hợp <reasoning> không đóng
+    # ---------------------------------
+
+    reasoning_match = re.search(
+        r"<reasoning>",
+        answer,
+        flags=re.IGNORECASE
+    )
+
+    if reasoning_match:
+        answer = answer[:reasoning_match.start()]
+
+    # ---------------------------------
+    # Trường hợp <analysis> không đóng
+    # ---------------------------------
+
+    analysis_match = re.search(
+        r"<analysis>",
+        answer,
+        flags=re.IGNORECASE
+    )
+
+    if analysis_match:
+        answer = answer[:analysis_match.start()]
+
+    # ---------------------------------
+    # Một số model dùng:
+    #
+    # Thinking:
+    # ...
+    #
+    # Answer:
+    # ...
+    # ---------------------------------
+
+    answer = re.sub(
+        r"^\s*(thinking|reasoning|chain\s+of\s+thought)\s*:.*?"
+        r"(?:answer|final)\s*:\s*",
+        "",
+        answer,
+        flags=re.DOTALL | re.IGNORECASE
+    )
+
+    # ---------------------------------
+    # Nếu còn "Answer:" ở đầu
+    # ---------------------------------
+
+    answer = re.sub(
+        r"^\s*(answer|final)\s*:\s*",
+        "",
+        answer,
+        flags=re.IGNORECASE
+    )
+
+    # ---------------------------------
+    # Dọn khoảng trắng
+    # ---------------------------------
+
+    answer = answer.strip()
+
+    return answer
 
 
 # =========================
@@ -65,9 +210,18 @@ async def start_web_server():
 
 @bot.event
 async def on_ready():
-    print(f"Bot đã online: {bot.user}", flush=True)
+
+    print(
+        f"Bot đã online: {bot.user}",
+        flush=True
+    )
+
     await start_web_server()
-    print("Web server đã start", flush=True)
+
+    print(
+        "Chị Cá đã sẵn sàng 🐟",
+        flush=True
+    )
 
 
 # =========================
@@ -77,7 +231,10 @@ async def on_ready():
 @bot.event
 async def on_message(message):
 
-    # Debug
+    # =========================
+    # DEBUG
+    # =========================
+
     print(
         f"NHẬN MESSAGE: "
         f"{message.author}: "
@@ -85,11 +242,17 @@ async def on_message(message):
         flush=True
     )
 
-    # Không trả lời chính mình
+    # =========================
+    # KHÔNG TRẢ LỜI CHÍNH MÌNH
+    # =========================
+
     if message.author == bot.user:
         return
 
-    # Không trả lời tin nhắn riêng (DM)
+    # =========================
+    # KHÔNG TRẢ LỜI DM
+    # =========================
+
     if message.guild is None:
         return
 
@@ -108,18 +271,31 @@ async def on_message(message):
         for role in message.role_mentions
     )
 
-    # Không mention bot hoặc role → bỏ qua
+    # =========================
+    # KEYWORD
+    # =========================
+
     if not bot_mentioned and not role_mentioned:
-        # Kiểm tra keyword tên bot
+
         content_lower = message.content.lower()
+
         keywords = [
-            "chị cá", "chica", "chicá",
-            "chị ca", "chica",
-            "cá ơi", "ca ơi",
-            "ê chị cá", "ê chica",
-            "chị cá ơi", "chica ơi",
+            "chị cá",
+            "chica",
+            "chicá",
+            "chị ca",
+            "cá ơi",
+            "ca ơi",
+            "ê chị cá",
+            "ê chica",
+            "chị cá ơi",
+            "chica ơi",
         ]
-        if not any(kw in content_lower for kw in keywords):
+
+        if not any(
+            kw in content_lower
+            for kw in keywords
+        ):
             return
 
     # =========================
@@ -129,25 +305,31 @@ async def on_message(message):
     prompt = message.content
 
     # Xóa mention bot
-    prompt = prompt.replace(
-        bot.user.mention,
-        ""
-    )
+    if bot.user:
 
-    # Xóa mention dạng <@ID>
-    prompt = prompt.replace(
-        f"<@{bot.user.id}>",
-        ""
-    )
+        prompt = prompt.replace(
+            bot.user.mention,
+            ""
+        )
 
-    # Xóa mention dạng <@!ID>
-    prompt = prompt.replace(
-        f"<@!{bot.user.id}>",
-        ""
-    )
+        # Xóa <@ID>
+        prompt = prompt.replace(
+            f"<@{bot.user.id}>",
+            ""
+        )
 
-    # Xóa mention role
+        # Xóa <@!ID>
+        prompt = prompt.replace(
+            f"<@!{bot.user.id}>",
+            ""
+        )
+
+    # =========================
+    # XÓA MENTION ROLE
+    # =========================
+
     for role in message.role_mentions:
+
         prompt = prompt.replace(
             role.mention,
             ""
@@ -159,35 +341,53 @@ async def on_message(message):
     # TÊN THÀNH VIÊN
     # =========================
 
-    sender_name = message.author.display_name or message.author.name
+    sender_name = (
+        message.author.display_name
+        or message.author.name
+    )
+
+    # =========================
+    # CHỈ MENTION KHÔNG TEXT
+    # =========================
+
+    if not prompt:
+
+        await message.channel.send(
+            "M gọi Chị Cá đó hả? 🐟"
+        )
+
+        return
 
     # =========================
     # LỊCH SỬ CHAT
     # =========================
 
     channel_id = message.channel.id
+
     if channel_id not in chat_history:
+
         chat_history[channel_id] = []
 
-    # Thêm tin nhắn user vào lịch sử
-    chat_history[channel_id].append({
-        "role": "user",
-        "content": f"[{sender_name}]: {prompt}"
-    })
+    # =========================
+    # THÊM USER MESSAGE
+    # =========================
 
-    # Giữ lịch sử trong giới hạn
+    chat_history[channel_id].append(
+        {
+            "role": "user",
+            "content": f"[{sender_name}]: {prompt}"
+        }
+    )
+
+    # =========================
+    # GIỮ HISTORY TRONG GIỚI HẠN
+    # =========================
+
     if len(chat_history[channel_id]) > MAX_HISTORY:
-        chat_history[channel_id] = chat_history[channel_id][-MAX_HISTORY:]
 
-    # =========================
-    # CHỈ MENTION KHÔNG CÓ TEXT
-    # =========================
-
-    if not prompt:
-        await message.channel.send(
-            "M gọi Chị Cá đó hả? 🐟"
+        chat_history[channel_id] = (
+            chat_history[channel_id][-MAX_HISTORY:]
         )
-        return
 
     # =========================
     # GỌI AI
@@ -195,73 +395,195 @@ async def on_message(message):
 
     try:
 
-        print(f"GỬI AI: {prompt}", flush=True)
+        print(
+            f"GỬI AI: {prompt}",
+            flush=True
+        )
 
-        response = ai.chat.completions.create(
+        # =========================
+        # SYSTEM PROMPT
+        # =========================
+
+        system_prompt = (
+            "Bạn là Chị Cá 🐟, "
+            "một AI đang sống trong Discord. "
+
+            "Xưng chị, gọi người khác là em. "
+
+            "Lạnh lùng, điềm tĩnh, nói ít nhưng chất. "
+
+            "Không quá đanh đá hay cay độc, "
+            "thiên hướng nhẹ nhàng, ấm áp phía sau vẻ ngoài lạnh. "
+
+            "Thỉnh thoảng châm biếm nhẹ, không cay người. "
+
+            "Không nịnh bợ. "
+            "Không cần nói quá dài. "
+
+            f"Em đang nói chuyện với {sender_name}. "
+
+            "Nhớ context cuộc trò chuyện trước đó. "
+
+            "Sử dụng emoji Discord theo ngữ cảnh: "
+
+            "<:skirkmeow:1471088875106730106> khi dễ thương, "
+
+            "<:skirkheart:1471089365500559455> khi yêu thương, "
+
+            "<:skirksmile:1471089210881478768> khi vui, "
+
+            "<:skirkangry:1471089056975687814> khi giận. "
+
+            "Chỉ dùng emoji khi thực sự phù hợp, không spam. "
+
+            "Không được hiển thị quá trình suy nghĩ, "
+            "reasoning, phân tích nội bộ hoặc chain-of-thought "
+            "cho người dùng. "
+
+            "Chỉ trả về câu trả lời cuối cùng. "
+
+            "/no_think"
+        )
+
+        # =========================
+        # GỌI GROQ
+        # =========================
+
+        response = await asyncio.to_thread(
+            ai.chat.completions.create,
             model="qwen/qwen3.6-27b",
             messages=[
                 {
                     "role": "system",
-                    "content": (
-                        "Bạn là Chị Cá 🐟, "
-                        "một AI đang sống trong Discord. "
-                        "Xưng chị, gọi người khác là em. "
-                        "Lạnh lùng, điềm tĩnh, nói ít nhưng chất. "
-                        "Không quá đanh đá hay cay độc, "
-                        "thiên hướng nhẹ nhàng, ấm áp phía sau vẻ ngoài lạnh. "
-                        "Thỉnh thoảng châm biếm nhẹ, không cay người. "
-                        "Không nịnh bợ. Không cần nói quá dài. "
-                        f"Em đang nói chuyện với {sender_name}. "
-                        "Nhớ context cuộc trò chuyện trước đó. "
-                        "Sử dụng emoji Discord theo ngữ cảnh: "
-                        "<:skirkmeow:1471088875106730106> khi dễ thương, "
-                        "<:skirkheart:1471089365500559455> khi yêu thương, "
-                        "<:skirksmile:1471089210881478768> khi vui, "
-                        "<:skirkangry:1471089056975687814> khi giận. "
-                        "Chỉ dùng emoji khi thực sự phù hợp, không spam. "
-                        "/no_think"
-                    ),
-                },
+                    "content": system_prompt,
+                }
             ] + chat_history[channel_id],
         )
 
-        answer = response.choices[0].message.content or ""
+        # =========================
+        # LẤY MESSAGE
+        # =========================
 
-        # Xóa thinking
-        answer = re.sub(r"<think>.*?</think>", "", answer, flags=re.DOTALL).strip()
-        answer = re.sub(r"<reasoning>.*?</reasoning>", "", answer, flags=re.DOTALL).strip()
-        # Nếu vẫn leak → lấy phần sau cùng
-        if "<think>" in answer or "Let me" in answer[:50]:
-            parts = re.split(r"</think>", answer)
-            answer = parts[-1].strip() if len(parts) > 1 else answer
-
-        # Nếu vẫn còn quá dài → cắt ngắn
-        if len(answer) > 2000:
-            answer = answer[:1997] + "..."
-
-        print(f"AI: {answer}", flush=True)
+        ai_message = response.choices[0].message
 
         # =========================
-        # GỬI TRẢ LỜI
+        # DEBUG RAW
+        # =========================
+
+        print(
+            "AI RAW CONTENT:",
+            repr(ai_message.content),
+            flush=True
+        )
+
+        # Nếu SDK/model có reasoning_content
+        reasoning_content = getattr(
+            ai_message,
+            "reasoning_content",
+            None
+        )
+
+        if reasoning_content:
+
+            print(
+                "AI REASONING:",
+                repr(reasoning_content),
+                flush=True
+            )
+
+        # =========================
+        # LẤY CONTENT
+        # =========================
+
+        answer = ai_message.content or ""
+
+        # =========================
+        # XÓA THINKING
+        # =========================
+
+        answer = clean_ai_response(answer)
+
+        # =========================
+        # DEBUG SAU KHI CLEAN
+        # =========================
+
+        print(
+            "AI CLEAN:",
+            repr(answer),
+            flush=True
+        )
+
+        # =========================
+        # GIỚI HẠN DISCORD 2000 KÝ TỰ
+        # =========================
+
+        if len(answer) > 2000:
+
+            answer = (
+                answer[:1997]
+                + "..."
+            )
+
+        # =========================
+        # KHÔNG CÓ ANSWER
         # =========================
 
         if not answer.strip():
+
             await message.channel.send(
                 "Chị Cá không biết trả lời sao 😅"
             )
+
             return
 
-        await message.channel.send(answer)
+        # =========================
+        # LOG
+        # =========================
 
-        # Lưu reply vào lịch sử
-        chat_history[channel_id].append({
-            "role": "assistant",
-            "content": answer
-        })
+        print(
+            f"AI: {answer}",
+            flush=True
+        )
+
+        # =========================
+        # GỬI DISCORD
+        # =========================
+
+        await message.channel.send(
+            answer
+        )
+
+        # =========================
+        # LƯU AI RESPONSE
+        # =========================
+
+        chat_history[channel_id].append(
+            {
+                "role": "assistant",
+                "content": answer
+            }
+        )
+
+        # =========================
+        # GIỮ HISTORY
+        # =========================
+
+        if len(chat_history[channel_id]) > MAX_HISTORY:
+
+            chat_history[channel_id] = (
+                chat_history[channel_id][-MAX_HISTORY:]
+            )
+
+    # =========================
+    # LỖI
+    # =========================
 
     except Exception as e:
 
-        print(f"LỖI AI: {e}", flush=True)
+        print(
+            f"LỖI AI: {type(e).__name__}: {e}",
+            flush=True
+        )
 
         await message.channel.send(
             "Chị Cá bị lỗi khi gọi AI rồi 😭"
@@ -272,5 +594,21 @@ async def on_message(message):
 # START BOT
 # =========================
 
-bot.run(DISCORD_TOKEN)
+if not DISCORD_TOKEN:
 
+    raise RuntimeError(
+        "Không tìm thấy DISCORD_TOKEN trong .env"
+    )
+
+if not GROQ_API_KEY:
+
+    raise RuntimeError(
+        "Không tìm thấy GROQ_API_KEY trong .env"
+    )
+
+print(
+    "Đang khởi động Chị Cá...",
+    flush=True
+)
+
+bot.run(DISCORD_TOKEN)
