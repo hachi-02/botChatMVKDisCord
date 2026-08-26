@@ -12,6 +12,7 @@ from web_server import start_web_server
 
 intents = discord.Intents.default()
 intents.members = True
+intents.presences = True
 intents.message_content = True
 
 bot = discord.Client(intents=intents)
