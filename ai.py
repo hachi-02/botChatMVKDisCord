@@ -10,7 +10,7 @@ ai = OpenAI(
 )
 
 
-def get_system_prompt(sender_name: str) -> str:
+def get_system_prompt(sender_name: str, known_users: str = "") -> str:
     return (
         "Bạn là Chị Cá 🐟, "
         "một AI đang sống trong Discord. "
@@ -32,7 +32,9 @@ def get_system_prompt(sender_name: str) -> str:
 
         f"Em đang nói chuyện với {sender_name}. "
 
-        "Nhớ context cuộc trò chuyện trước đó. "
+        + (f"{known_users} " if known_users else "")
+
+        + "Nhớ context cuộc trò chuyện trước đó. "
 
         "CHỬI TỤC: "
         "Khi có tag [CHỬI] hoặc [CHỌC GHẸO], chửi tục NẶNG. "

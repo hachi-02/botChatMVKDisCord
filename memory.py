@@ -1,6 +1,7 @@
 from config import MAX_HISTORY
 
 chat_history = {}
+user_names = {}
 
 
 def add_message(channel_id: int, role: str, content: str):
@@ -21,3 +22,14 @@ def add_message(channel_id: int, role: str, content: str):
 
 def get_history(channel_id: int) -> list:
     return chat_history.get(channel_id, [])
+
+
+def remember_user(user_id: int, name: str):
+    user_names[user_id] = name
+
+
+def get_known_users() -> str:
+    if not user_names:
+        return ""
+    lines = [f"- {name}" for name in user_names.values()]
+    return "Các em đã gặp trước đó: " + ", ".join(user_names.values())

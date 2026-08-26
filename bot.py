@@ -6,7 +6,7 @@ import discord
 
 from config import ROLE_ID, KEYWORDS, CHUI_KEYWORDS, PROVOCATION_KEYWORDS, SEARCH_KEYWORDS, PROACTIVE_CHANCE, MIN_MESSAGE_LENGTH, PROACTIVE_KEYWORDS, MODEL_NAME, MEMBER_KEYWORDS
 from ai import ai, get_system_prompt, clean_ai_response
-from memory import add_message, get_history
+from memory import add_message, get_history, remember_user, get_known_users
 from search import search_web
 from web_server import start_web_server
 
@@ -80,7 +80,7 @@ async def on_message(message):
                 if online_count > 20:
                     result += f"\n...và {online_count - 20} người nữa"
 
-                await message.channel.send(result)
+                await message.channel.send(result, reference=message)
                 return
 
             is_proactive = (
@@ -145,7 +145,7 @@ async def on_message(message):
         if online_count > 20:
             result += f"\n...và {online_count - 20} người nữa"
 
-        await message.channel.send(result)
+        await message.channel.send(result, reference=message)
         return
 
     # =========================
@@ -161,30 +161,32 @@ async def on_message(message):
         print(f"KẾT QUẢ TÌM KIỂM: {search_results[:200]}...", flush=True)
 
     if not prompt:
-        await message.channel.send("M gọi Chị Cá đó hả? 🐟")
+        await message.channel.send("M gọi Chị Cá đó hả? 🐟", reference=message)
         return
 
     channel_id = message.channel.id
 
+    remember_user(message.author.id, sender_name)
     add_message(channel_id, "user", f"[{sender_name}]: {prompt}")
 
     try:
         print(f"GỬI AI: {prompt}", flush=True)
 
-        system_prompt = get_system_prompt(sender_name)
+        system_prompt = get_system_prompt(sender_name, get_known_users())
 
-        response = await asyncio.to_thread(
-            ai.chat.completions.create,
-            model=MODEL_NAME,
-            reasoning_effort="default",
-            max_tokens=4096,
-            messages=[
-                {
-                    "role": "system",
-                    "content": system_prompt,
-                }
-            ] + get_history(channel_id),
-        )
+        async with message.channel.typing():
+            response = await asyncio.to_thread(
+                ai.chat.completions.create,
+                model=MODEL_NAME,
+                reasoning_effort="default",
+                max_tokens=4096,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": system_prompt,
+                    }
+                ] + get_history(channel_id),
+            )
 
         ai_message = response.choices[0].message
         finish_reason = response.choices[0].finish_reason
@@ -218,18 +220,19 @@ async def on_message(message):
             if finish_reason == "length":
                 await message.channel.send(
                     "Câu này hơi dài, chị bị cắt ngang lúc đang trả lời rồi 😅 "
-                    "em hỏi ngắn gọn lại giúp chị nhé."
+                    "em hỏi ngắn gọn lại giúp chị nhé.",
+                    reference=message,
                 )
             else:
-                await message.channel.send("Chị Cá không biết trả lời sao 😅")
+                await message.channel.send("Chị Cá không biết trả lời sao 😅", reference=message)
             return
 
         print(f"AI: {answer}", flush=True)
 
-        await message.channel.send(answer)
+        await message.channel.send(answer, reference=message)
 
         add_message(channel_id, "assistant", answer)
 
     except Exception as e:
         print(f"LỖI AI: {type(e).__name__}: {e}", flush=True)
-        await message.channel.send("Chị Cá bị lỗi khi gọi AI rồi 😭")
+        await message.channel.send("Chị Cá bị lỗi khi gọi AI rồi 😭", reference=message)
