@@ -251,7 +251,7 @@ async def on_message(message):
                 minutes = remainder // 60
                 time_str = ""
                 if hours > 0:
-                    time_str += f"{hours} giờ "
+                    time_str += f"{hours} tiếng "
                 if minutes > 0:
                     time_str += f"{minutes} phút"
 
