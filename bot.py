@@ -6,7 +6,20 @@ from zoneinfo import ZoneInfo
 
 import discord
 
-from config import ROLE_ID, KEYWORDS, CHUI_KEYWORDS, PROVOCATION_KEYWORDS, SEARCH_KEYWORDS, PROACTIVE_CHANCE, MIN_MESSAGE_LENGTH, PROACTIVE_KEYWORDS, MODEL_NAME, MEMBER_KEYWORDS, POLL_KEYWORDS, REMIND_KEYWORDS
+from config import (
+    ROLE_ID,
+    KEYWORDS,
+    CHUI_KEYWORDS,
+    PROVOCATION_KEYWORDS,
+    SEARCH_KEYWORDS,
+    PROACTIVE_CHANCE,
+    MIN_MESSAGE_LENGTH,
+    PROACTIVE_KEYWORDS,
+    MODEL_NAME,
+    MEMBER_KEYWORDS,
+    POLL_KEYWORDS,
+    REMIND_KEYWORDS,
+)
 from ai import ai, get_system_prompt, clean_ai_response
 from memory import add_message, get_history, remember_user, get_known_users
 from search import search_web
@@ -31,20 +44,26 @@ def parse_remind_time(text: str):
     match = re.search(r"(?:ngày\s*mai|mai)\s+(\d{1,2})[h:](\d{2})", text)
     if match:
         hour, minute = int(match.group(1)), int(match.group(2))
-        target = (now + timedelta(days=1)).replace(hour=hour, minute=minute, second=0, microsecond=0)
+        target = (now + timedelta(days=1)).replace(
+            hour=hour, minute=minute, second=0, microsecond=0
+        )
         return target
 
     match = re.search(r"(?:ngày\s*mai|mai)\s+(\d{1,2})h\b", text)
     if match:
         hour = int(match.group(1))
-        target = (now + timedelta(days=1)).replace(hour=hour, minute=0, second=0, microsecond=0)
+        target = (now + timedelta(days=1)).replace(
+            hour=hour, minute=0, second=0, microsecond=0
+        )
         return target
 
     match = re.search(r"(\d{1,2})/(\d{1,2})\s+(\d{1,2})[h:](\d{2})", text)
     if match:
         day, month = int(match.group(1)), int(match.group(2))
         hour, minute = int(match.group(3)), int(match.group(4))
-        target = now.replace(day=day, month=month, hour=hour, minute=minute, second=0, microsecond=0)
+        target = now.replace(
+            day=day, month=month, hour=hour, minute=minute, second=0, microsecond=0
+        )
         if target <= now:
             target = target.replace(year=target.year + 1)
         return target
@@ -53,7 +72,9 @@ def parse_remind_time(text: str):
     if match:
         day, month = int(match.group(1)), int(match.group(2))
         hour = int(match.group(3))
-        target = now.replace(day=day, month=month, hour=hour, minute=0, second=0, microsecond=0)
+        target = now.replace(
+            day=day, month=month, hour=hour, minute=0, second=0, microsecond=0
+        )
         if target <= now:
             target = target.replace(year=target.year + 1)
         return target
@@ -61,7 +82,9 @@ def parse_remind_time(text: str):
     match = re.search(r"(\d{1,2})/(\d{1,2})\b", text)
     if match:
         day, month = int(match.group(1)), int(match.group(2))
-        target = now.replace(day=day, month=month, hour=0, minute=0, second=0, microsecond=0)
+        target = now.replace(
+            day=day, month=month, hour=0, minute=0, second=0, microsecond=0
+        )
         if target <= now:
             target = target.replace(year=target.year + 1)
         return target
@@ -141,10 +164,7 @@ async def on_member_join(member):
 @bot.event
 async def on_message(message):
 
-    print(
-        f"NHẬN MESSAGE: {message.author}: {message.content}",
-        flush=True
-    )
+    print(f"NHẬN MESSAGE: {message.author}: {message.content}", flush=True)
 
     if message.author == bot.user:
         return
@@ -154,10 +174,7 @@ async def on_message(message):
 
     bot_mentioned = bot.user in message.mentions
 
-    role_mentioned = any(
-        role.id == ROLE_ID
-        for role in message.role_mentions
-    )
+    role_mentioned = any(role.id == ROLE_ID for role in message.role_mentions)
 
     content_lower = message.content.lower()
 
@@ -176,7 +193,9 @@ async def on_message(message):
                     role = m.top_role.name if m.top_role.name != "@everyone" else ""
                     status = "🟢" if m.status == discord.Status.online else "🟡"
                     name = m.display_name
-                    member_lines.append(f"{status} {name}" + (f" ({role})" if role else ""))
+                    member_lines.append(
+                        f"{status} {name}" + (f" ({role})" if role else "")
+                    )
 
                 result = f"**Thành viên đang online: {online_count}/{total}**\n"
                 result += "\n".join(member_lines)
@@ -219,32 +238,50 @@ async def on_message(message):
             if is_remind:
                 raw = message.content
                 raw = re.sub(r"(?i)^(chị\s*cá|chica)\s*", "", raw).strip()
-                raw = re.sub(r"(?i)^(nhắc\s*(t|tôi|em|e|tui)|remind)\s*", "", raw).strip()
+                raw = re.sub(
+                    r"(?i)^(nhắc\s*(t|tôi|em|e|tui)|remind)\s*", "", raw
+                ).strip()
 
                 now = datetime.now(ZoneInfo("Asia/Ho_Chi_Minh"))
                 remind_time = parse_remind_time(raw)
                 if not remind_time:
                     await message.channel.send(
-                        "Em viết chưa rõ thời gian rồi. "
-                        "Ví dụ: `nhắc t 30 phút học bài`, `remind 7h đi ngủ`, "
-                        "`nhắc t ngày mai 8h30 dậy`, hoặc `nhắc t 25/12 đi chợ` 🐟",
+                        "Chị chưa hiểu thời gian em muốn nhắc!\n\n"
+                        "**📌 Ví dụ cách dùng:**\n"
+                        "• `nhắc em 30 phút học bài`->`30 phút đếm ngược`\n"
+                        "• `nhắc em 1 tiếng học bài`->`1 tiếng đếm ngược`\n"
+                        "• `nhắc em 7h học bài`->`7:00 giờ cố dịnh`\n"
+                        "• `nhắc em ngày mai 8h30 dậy`\n"
+                        "• `nhắc em 25/12 đi chợ`\n\n"
+                        "💡Chỉ cần nói thời gian + việc cần nhắc là được!",
                         reference=message,
                     )
                     return
 
-                task = re.sub(r"(?:ngày\s*mai|mai)\s*\d+[h:]\d*\b", "", raw, flags=re.IGNORECASE).strip()
-                task = re.sub(r"\d+/\d+\s*\d+[h:]\d*\b", "", task, flags=re.IGNORECASE).strip()
+                task = re.sub(
+                    r"(?:ngày\s*mai|mai)\s*\d+[h:]\d*\b", "", raw, flags=re.IGNORECASE
+                ).strip()
+                task = re.sub(
+                    r"\d+/\d+\s*\d+[h:]\d*\b", "", task, flags=re.IGNORECASE
+                ).strip()
                 task = re.sub(r"\d+/\d+\b", "", task, flags=re.IGNORECASE).strip()
-                task = re.sub(r"\d+\s*(phút|giờ|ngày|giây|min|p|h|hour|day|second|tieng|tiếng)[\s:]*\d*", "", task, flags=re.IGNORECASE).strip()
+                task = re.sub(
+                    r"\d+\s*(phút|giờ|ngày|giây|min|p|h|hour|day|second|tieng|tiếng)[\s:]*\d*",
+                    "",
+                    task,
+                    flags=re.IGNORECASE,
+                ).strip()
                 if not task:
                     task = "đến giờ rồi"
 
-                remind_queue.append({
-                    "user_id": message.author.id,
-                    "channel_id": message.channel.id,
-                    "time": remind_time,
-                    "task": task,
-                })
+                remind_queue.append(
+                    {
+                        "user_id": message.author.id,
+                        "channel_id": message.channel.id,
+                        "time": remind_time,
+                        "task": task,
+                    }
+                )
 
                 diff = remind_time - now
                 hours, remainder = divmod(int(diff.total_seconds()), 3600)
@@ -271,10 +308,7 @@ async def on_message(message):
                 return
 
             prompt = f"[TỰ ĐỘNG] {message.content}"
-            sender_name = (
-                message.author.display_name
-                or message.author.name
-            )
+            sender_name = message.author.display_name or message.author.name
 
             is_chui = False
             is_provoked = False
@@ -294,10 +328,7 @@ async def on_message(message):
 
     prompt = prompt.strip()
 
-    sender_name = (
-        message.author.display_name
-        or message.author.name
-    )
+    sender_name = message.author.display_name or message.author.name
 
     if is_chui:
         prompt = f"[CHỬI] {prompt}"
@@ -363,7 +394,8 @@ async def on_message(message):
                         "role": "system",
                         "content": system_prompt,
                     }
-                ] + get_history(channel_id),
+                ]
+                + get_history(channel_id),
             )
 
         ai_message = response.choices[0].message
@@ -404,7 +436,9 @@ async def on_message(message):
                     reference=message,
                 )
             else:
-                await message.channel.send("Chị Cá không biết trả lời sao 😅", reference=message)
+                await message.channel.send(
+                    "Chị Cá không biết trả lời sao 😅", reference=message
+                )
             return
 
         print(f"AI: {answer}", flush=True)
