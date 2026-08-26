@@ -290,8 +290,8 @@ async def on_message(message):
         answer = "\n".join(clean_lines).strip()
 
         # Nếu vẫn còn quá dài → cắt ngắn
-        if len(answer) > 4000:
-            answer = answer[:3997] + "..."
+        if len(answer) > 2000:
+            answer = answer[:1997] + "..."
 
         print(f"AI: {answer}", flush=True)
 
