@@ -246,11 +246,11 @@ async def on_message(message):
                 remind_time = parse_remind_time(raw)
                 if not remind_time:
                     await message.channel.send(
-                        "Chị chưa hiểu thời gian em muốn nhắc!\n\n"
+                        "Chị chưa hiểu thời gian em muốn nhắc!\n"
                         "**📌 Ví dụ cách dùng:**\n"
                         "• `nhắc em 30 phút học bài`->`30 phút đếm ngược`\n"
                         "• `nhắc em 1 tiếng học bài`->`1 tiếng đếm ngược`\n"
-                        "• `nhắc em 7h học bài`->`7:00 giờ cố dịnh`\n"
+                        "• `nhắc em 7h học bài`->`7:00 giờ cố định`\n"
                         "• `nhắc em ngày mai 8h30 dậy`\n"
                         "• `nhắc em 25/12 đi chợ`\n\n"
                         "💡Chỉ cần nói thời gian + việc cần nhắc là được!",
