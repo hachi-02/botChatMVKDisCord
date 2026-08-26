@@ -43,6 +43,11 @@ def get_system_prompt(sender_name: str) -> str:
         "Viết câu chửi đầy đủ, không bị cụt giữa chừng. "
         "Ngắn gọn nhưng phải hoàn chỉnh câu chữ. "
 
+        "TỰ ĐỘNG: "
+        "Khi có tag [TỰ ĐỘNG], bot đang tự tham gia trò chuyện. "
+        "Viết câu bình luận ngắn gọn, tự nhiên, phù hợp context. "
+        "Không spam, không gây phiền. "
+
         "Sử dụng emoji Discord theo ngữ cảnh: "
 
         "<:skirkmeow:1471088875106730106> khi dễ thương, "
@@ -116,6 +121,7 @@ def clean_ai_response(answer: str) -> str:
 
     answer = re.sub(r"\[CHỬI\]\s*", "", answer)
     answer = re.sub(r"\[CHỌC GHẸO\]\s*", "", answer)
+    answer = re.sub(r"\[TỰ ĐỘNG\]\s*", "", answer)
 
     answer = answer.strip()
 

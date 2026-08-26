@@ -40,3 +40,13 @@ SEARCH_KEYWORDS = [
     "bao nhiêu", "khi nào", "ở đâu", "tại sao", "thế nào",
     "có thật", "đúng không", "so sánh", "phân biệt",
 ]
+
+PROACTIVE_CHANCE = 0.2
+MIN_MESSAGE_LENGTH = 10
+PROACTIVE_KEYWORDS = [
+    "game", "anime", "phim", "nhạc", "bài hát",
+    "đồ ăn", "món ăn", "nấu", "ăn",
+    "thể thao", "bóng đá", "cầu thủ",
+    "học", "bài tập", "thi", "điểm",
+    "tinder", "love", "crush", "tình yêu",
+]

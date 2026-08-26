@@ -1,9 +1,10 @@
 import asyncio
+import random
 import re
 
 import discord
 
-from config import ROLE_ID, KEYWORDS, CHUI_KEYWORDS, PROVOCATION_KEYWORDS, SEARCH_KEYWORDS, MODEL_NAME
+from config import ROLE_ID, KEYWORDS, CHUI_KEYWORDS, PROVOCATION_KEYWORDS, SEARCH_KEYWORDS, PROACTIVE_CHANCE, MIN_MESSAGE_LENGTH, PROACTIVE_KEYWORDS, MODEL_NAME
 from ai import ai, get_system_prompt, clean_ai_response
 from memory import add_message, get_history
 from search import search_web
@@ -47,7 +48,27 @@ async def on_message(message):
 
     if not bot_mentioned and not role_mentioned:
         if not any(kw in content_lower for kw in KEYWORDS):
-            return
+            # =========================
+            # PROACTIVE INTERACTION
+            # =========================
+
+            is_proactive = (
+                len(message.content) > MIN_MESSAGE_LENGTH
+                and random.random() < PROACTIVE_CHANCE
+                and any(kw in content_lower for kw in PROACTIVE_KEYWORDS)
+            )
+
+            if not is_proactive:
+                return
+
+            prompt = f"[TỰ ĐỘNG] {message.content}"
+            sender_name = (
+                message.author.display_name
+                or message.author.name
+            )
+
+            is_chui = False
+            is_provoked = False
 
     is_chui = any(kw in content_lower for kw in CHUI_KEYWORDS)
     is_provoked = any(kw in content_lower for kw in PROVOCATION_KEYWORDS)
