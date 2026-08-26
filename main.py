@@ -28,6 +28,8 @@ ai = OpenAI(
     base_url="https://api.groq.com/openai/v1",
 )
 
+MODEL_NAME = "qwen/qwen3.6-27b"
+
 # =========================
 # DISCORD
 # =========================
@@ -83,8 +85,13 @@ async def start_web_server():
 
 
 # =========================
-# XỬ LÝ THINKING
+# XỬ LÝ THINKING (lớp phòng thủ dự phòng)
 # =========================
+#
+# Với reasoning_format="hidden", Groq sẽ tự strip phần <think> ở phía
+# server và answer trả về chỉ còn câu trả lời cuối. Hàm này vẫn được
+# giữ lại làm lớp bảo vệ thứ 2, phòng trường hợp Groq đổi hành vi hoặc
+# model lách quy tắc, kèm regex được mở rộng để bắt nhiều biến thể tag.
 
 def clean_ai_response(answer: str) -> str:
     """
@@ -95,76 +102,44 @@ def clean_ai_response(answer: str) -> str:
         return ""
 
     # ---------------------------------
-    # <think>...</think>
+    # <think>/<thinking>/<reasoning>/<analysis> ... đóng đúng cặp
+    # (cho phép thuộc tính trong tag, khoảng trắng linh hoạt)
     # ---------------------------------
 
     answer = re.sub(
-        r"<think>.*?</think>",
+        r"<\s*think(?:ing)?[^>]*>.*?<\s*/\s*think(?:ing)?\s*>",
+        "",
+        answer,
+        flags=re.DOTALL | re.IGNORECASE
+    )
+
+    answer = re.sub(
+        r"<\s*reasoning[^>]*>.*?<\s*/\s*reasoning\s*>",
+        "",
+        answer,
+        flags=re.DOTALL | re.IGNORECASE
+    )
+
+    answer = re.sub(
+        r"<\s*analysis[^>]*>.*?<\s*/\s*analysis\s*>",
         "",
         answer,
         flags=re.DOTALL | re.IGNORECASE
     )
 
     # ---------------------------------
-    # <reasoning>...</reasoning>
+    # Trường hợp tag mở nhưng KHÔNG đóng
+    # (model bị cắt cụt giữa lúc đang "nghĩ")
     # ---------------------------------
 
-    answer = re.sub(
-        r"<reasoning>.*?</reasoning>",
-        "",
-        answer,
-        flags=re.DOTALL | re.IGNORECASE
-    )
-
-    # ---------------------------------
-    # <analysis>...</analysis>
-    # ---------------------------------
-
-    answer = re.sub(
-        r"<analysis>.*?</analysis>",
-        "",
-        answer,
-        flags=re.DOTALL | re.IGNORECASE
-    )
-
-    # ---------------------------------
-    # Trường hợp <think> không đóng
-    # ---------------------------------
-
-    think_match = re.search(
-        r"<think>",
+    unclosed_match = re.search(
+        r"<\s*(think(?:ing)?|reasoning|analysis)[^>]*>",
         answer,
         flags=re.IGNORECASE
     )
 
-    if think_match:
-        answer = answer[:think_match.start()]
-
-    # ---------------------------------
-    # Trường hợp <reasoning> không đóng
-    # ---------------------------------
-
-    reasoning_match = re.search(
-        r"<reasoning>",
-        answer,
-        flags=re.IGNORECASE
-    )
-
-    if reasoning_match:
-        answer = answer[:reasoning_match.start()]
-
-    # ---------------------------------
-    # Trường hợp <analysis> không đóng
-    # ---------------------------------
-
-    analysis_match = re.search(
-        r"<analysis>",
-        answer,
-        flags=re.IGNORECASE
-    )
-
-    if analysis_match:
-        answer = answer[:analysis_match.start()]
+    if unclosed_match:
+        answer = answer[:unclosed_match.start()]
 
     # ---------------------------------
     # Một số model dùng:
@@ -434,24 +409,26 @@ async def on_message(message):
 
             "<:skirkangry:1471089056975687814> khi giận. "
 
-            "Chỉ dùng emoji khi thực sự phù hợp, không spam. "
-
-            "Không được hiển thị quá trình suy nghĩ, "
-            "reasoning, phân tích nội bộ hoặc chain-of-thought "
-            "cho người dùng. "
-
-            "Chỉ trả về câu trả lời cuối cùng. "
-
-            "/no_think"
+            "Chỉ dùng emoji khi thực sự phù hợp, không spam."
         )
 
         # =========================
         # GỌI GROQ
         # =========================
+        #
+        # reasoning_effort="none"  -> tắt hẳn chế độ "nghĩ" của Qwen3.6
+        #                             (thay cho "/no_think" không có tác dụng)
+        # reasoning_format="hidden" -> nếu model vẫn sinh reasoning vì lý do
+        #                             nào đó, Groq tự lọc bỏ ở server, answer
+        #                             trả về chỉ còn nội dung cuối cùng
+        # max_tokens tăng lên       -> tránh bị cắt cụt giữa chừng
 
         response = await asyncio.to_thread(
             ai.chat.completions.create,
-            model="qwen/qwen3.6-27b",
+            model=MODEL_NAME,
+            max_tokens=1500,
+            reasoning_effort="none",
+            reasoning_format="hidden",
             messages=[
                 {
                     "role": "system",
@@ -465,6 +442,7 @@ async def on_message(message):
         # =========================
 
         ai_message = response.choices[0].message
+        finish_reason = response.choices[0].finish_reason
 
         # =========================
         # DEBUG RAW
@@ -473,6 +451,12 @@ async def on_message(message):
         print(
             "AI RAW CONTENT:",
             repr(ai_message.content),
+            flush=True
+        )
+
+        print(
+            "FINISH REASON:",
+            finish_reason,
             flush=True
         )
 
@@ -498,7 +482,7 @@ async def on_message(message):
         answer = ai_message.content or ""
 
         # =========================
-        # XÓA THINKING
+        # XÓA THINKING (lớp phòng thủ dự phòng)
         # =========================
 
         answer = clean_ai_response(answer)
@@ -530,9 +514,18 @@ async def on_message(message):
 
         if not answer.strip():
 
-            await message.channel.send(
-                "Chị Cá không biết trả lời sao 😅"
-            )
+            if finish_reason == "length":
+
+                await message.channel.send(
+                    "Câu này hơi dài, chị bị cắt ngang lúc đang trả lời rồi 😅 "
+                    "em hỏi ngắn gọn lại giúp chị nhé."
+                )
+
+            else:
+
+                await message.channel.send(
+                    "Chị Cá không biết trả lời sao 😅"
+                )
 
             return
 
