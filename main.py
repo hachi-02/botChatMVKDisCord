@@ -203,6 +203,10 @@ async def on_message(message):
         song = prompt
         for kw in music_keywords:
             song = song.replace(kw, "").strip()
+        # Xóa tên bot
+        bot_names = ["chị cá", "chica", "chicá", "chị ca", "cá ơi", "ca ơi"]
+        for name in bot_names:
+            song = song.replace(name, "").strip()
         # Bỏ dấu ? và .
         song = song.rstrip("?.")
         if song:
