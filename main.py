@@ -425,7 +425,8 @@ async def on_message(message):
             ai.chat.completions.create,
             model=MODEL_NAME,
             max_tokens=1500,
-            reasoning_effort="none",
+            reasoning_effort="default",
+            extra_body={"reasoning_format": "hidden"},
             messages=[
                 {
                     "role": "system",
