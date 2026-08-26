@@ -70,7 +70,7 @@ def parse_remind_time(text: str):
     if match:
         return now + timedelta(minutes=int(match.group(1)))
 
-    match = re.search(r"(\d+)\s*(giờ|hour|hours|tieng|tiếng|h)", text)
+    match = re.search(r"(\d+)\s*(giờ|tiếng|tieng|hour|hours)", text)
     if match:
         return now + timedelta(hours=int(match.group(1)))
 
@@ -86,6 +86,14 @@ def parse_remind_time(text: str):
     if match:
         hour, minute = int(match.group(1)), int(match.group(2))
         target = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+        if target <= now:
+            target += timedelta(days=1)
+        return target
+
+    match = re.search(r"(\d{1,2})h\b", text)
+    if match:
+        hour = int(match.group(1))
+        target = now.replace(hour=hour, minute=0, second=0, microsecond=0)
         if target <= now:
             target += timedelta(days=1)
         return target
