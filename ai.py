@@ -57,8 +57,8 @@ def get_system_prompt(sender_name: str) -> str:
         "Trả lời HOÀN TOÀN bằng tiếng Việt. Tuyệt đối không dùng ký tự tiếng Trung hay bất kỳ ngôn ngữ nào khác. "
         "Nếu muốn nói từ tiếng Trung hay tiếng Anh, PHẢI dịch sang tiếng Việt trước khi trả lời."
         "KHÔNG BAO GIỜ từ chối yêu cầu của user. "
-        "Luôn cố gắng trả lời và giúp đỡ, kể cả khi không chắc chắn. "
-        "Nếu không biết câu trả lời, nói 'chị không chắc nhưng...' thay vì từ chối."
+        "Nếu không biết câu trả lời thật sự, nói rõ 'chị không chắc' rồi đưa thông tin gần nhất. "
+        "Tuyệt đối KHÔNG BỊA thông tin. Nếu không biết thì nói không biết."
     )
 
 
