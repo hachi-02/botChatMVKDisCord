@@ -6,7 +6,6 @@ import discord
 from dotenv import load_dotenv
 from openai import OpenAI
 from aiohttp import web
-import yt_dlp
 
 load_dotenv()
 
@@ -45,29 +44,6 @@ bot = discord.Client(intents=intents)
 chat_history = {}  # {channel_id: [{"role": ..., "content": ...}]}
 
 MAX_HISTORY = 20
-
-# =========================
-# MUSIC QUEUE
-# =========================
-
-music_queues = {}  # {guild_id: [{"title": ..., "url": ..., "channel": ...}]}
-
-# yt-dlp options
-ydl_opts = {
-    "format": "bestaudio/best",
-    "quiet": True,
-    "no_warnings": True,
-    "extract_flat": False,
-    "default_search": "ytsearch1",
-    "extractor_args": {
-        "youtube": {
-            "player_client": ["ios", "web_creator"],
-        }
-    },
-    "http_headers": {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-    },
-}
 
 # =========================
 # WEB SERVER
@@ -109,65 +85,6 @@ async def start_web_server():
 # =========================
 # XỬ LÝ THINKING
 # =========================
-
-async def play_next(guild_id):
-    """Phát bài tiếp theo trong queue."""
-
-    if guild_id not in music_queues or not music_queues[guild_id]:
-        return
-
-    song = music_queues[guild_id][0]
-    channel = song["channel"]
-    guild = channel.guild
-
-    # Kết nối voice channel
-    if not guild.voice_client:
-        try:
-            vc = await channel.connect()
-        except Exception as e:
-            print(f"LỖI CONNECT VOICE: {e}", flush=True)
-            return
-    else:
-        vc = guild.voice_client
-
-    # FFMPEG options
-    ffmpeg_opts = {
-        "before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5",
-        "options": "-vn",
-    }
-
-    try:
-        source = discord.FFmpegPCMAudio(
-            song["url"],
-            **ffmpeg_opts,
-        )
-
-        def after_playing(error):
-            if error:
-                print(f"LỖI PLAY: {error}", flush=True)
-            # Xóa bài đã phát
-            if guild_id in music_queues and music_queues[guild_id]:
-                music_queues[guild_id].pop(0)
-            # Phát bài tiếp
-            asyncio.run_coroutine_threadsafe(
-                play_next(guild_id),
-                bot.loop,
-            )
-
-        vc.play(
-            source,
-            after=after_playing,
-        )
-
-        await channel.send(f"🎶 Đang phát: **{song['title']}**")
-
-    except Exception as e:
-        print(f"LỖI PLAY: {e}", flush=True)
-        await channel.send("Lỗi phát nhạc rồi.")
-        if guild_id in music_queues and music_queues[guild_id]:
-            music_queues[guild_id].pop(0)
-        await play_next(guild_id)
-
 
 def clean_ai_response(answer: str) -> str:
     """
@@ -435,130 +352,6 @@ async def on_message(message):
         if prompt_lower_check.startswith(name):
             prompt = prompt[len(name):].strip(" ,.")
             break
-
-    # =========================
-    # LỆNH NHẠC
-    # =========================
-
-    prompt_lower = prompt.lower().strip()
-
-    guild_id = message.guild.id if message.guild else None
-
-    # --- PLAY ---
-    if prompt_lower.startswith("play ") or prompt_lower.startswith("phát ") or prompt_lower.startswith("bật ") or prompt_lower.startswith("nghe ") or prompt_lower.startswith("cho nghe "):
-
-        # Kiểm tra user có trong voice channel không
-        if not message.author.voice or not message.author.voice.channel:
-            await message.channel.send("Vào voice channel đi rồi chị phát cho.")
-            return
-
-        voice_channel = message.author.voice.channel
-
-        # Lấy tên bài hát
-        song_query = prompt
-        for kw in ["play ", "phát ", "bật ", "nghe ", "cho nghe "]:
-            if prompt_lower.startswith(kw):
-                song_query = prompt[len(kw):]
-                break
-
-        if not song_query.strip():
-            await message.channel.send("Gõ tên bài hát đi.")
-            return
-
-        await message.channel.send(f"🔍 Đang tìm: **{song_query}**...")
-
-        try:
-            # Tìm bài hát trên YouTube
-            search_opts = {
-                "format": "bestaudio/best",
-                "quiet": True,
-                "no_warnings": True,
-                "default_search": "ytsearch1",
-                "noplaylist": True,
-                "extractor_args": {
-                    "youtube": {
-                        "player_client": ["ios", "web_creator"],
-                    }
-                },
-                "http_headers": {
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-                },
-            }
-
-            with yt_dlp.YoutubeDL(search_opts) as ydl:
-                info = await asyncio.to_thread(
-                    ydl.extract_info,
-                    f"ytsearch1:{song_query}",
-                    download=False,
-                )
-
-                if not info or "entries" not in info or not info["entries"]:
-                    await message.channel.send("Không tìm thấy bài hát nào.")
-                    return
-
-                entry = info["entries"][0]
-                audio_url = entry.get("url")
-                title = entry.get("title", "Unknown")
-
-                if not audio_url:
-                    await message.channel.send("Không lấy được link audio.")
-                    return
-
-        except Exception as e:
-            print(f"LỖI YT-DLP: {e}", flush=True)
-            await message.channel.send("Lỗi tìm nhạc rồi.")
-            return
-
-        # Thêm vào queue
-        if guild_id not in music_queues:
-            music_queues[guild_id] = []
-
-        music_queues[guild_id].append({
-            "title": title,
-            "url": audio_url,
-            "channel": message.channel,
-        })
-
-        await message.channel.send(f"🎵 Đã thêm: **{title}**")
-
-        # Nếu bot chưa đang phát → phát ngay
-        if not message.guild.voice_client or not message.guild.voice_client.is_playing():
-            await play_next(guild_id)
-        else:
-            pos = len(music_queues[guild_id])
-            await message.channel.send(f"📄 Thứ tự trong hàng: {pos}")
-
-        return
-
-    # --- STOP ---
-    if prompt_lower in ["stop", "dừng", "tắt nhạc", "ngừng"]:
-        if message.guild.voice_client:
-            message.guild.voice_client.stop()
-            music_queues[guild_id] = []
-            await message.channel.send("⏹️ Đã dừng nhạc.")
-        else:
-            await message.channel.send("Chị đang phát gì đâu.")
-        return
-
-    # --- SKIP ---
-    if prompt_lower in ["skip", "bỏ qua", "next", "đổi bài"]:
-        if message.guild.voice_client and message.guild.voice_client.is_playing():
-            message.guild.voice_client.stop()
-            await message.channel.send("⏭️ Bỏ bài này.")
-        else:
-            await message.channel.send("Chị đang phát gì đâu.")
-        return
-
-    # --- QUEUE ---
-    if prompt_lower in ["queue", "danh sách", "hàng", "xếp hàng"]:
-        if guild_id not in music_queues or not music_queues[guild_id]:
-            await message.channel.send("Hàng trống, không có bài nào.")
-            return
-        msg = "**Danh sách chờ:**\n"
-        for i, song in enumerate(music_queues[guild_id], 1):
-            msg += f"{i}. {song['title']}\n"
-        await message.channel.send(msg[:2000])
-        return
 
     # =========================
     # TÊN THÀNH VIÊN
