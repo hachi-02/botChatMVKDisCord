@@ -38,7 +38,7 @@ def get_system_prompt(sender_name: str) -> str:
         "Khi bị xúc phạm → chửi lại thậm tệ hơn. "
         "Sau khi chửi xong, quay lại bình thường. "
         "Viết câu chửi đầy đủ, không bị cụt giữa chừng. "
-        "Ngắn gọn nhưng phải hoàn chỉnh câu chữ. "
+        "Ngắn gọn khoảng 2-3 dòng nhưng phải hoàn chỉnh câu chữ. "
 
         "Sử dụng emoji Discord theo ngữ cảnh: "
 
