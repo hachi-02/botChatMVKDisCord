@@ -79,7 +79,10 @@ async def start_web_server():
 
     await site.start()
 
-    print(f"Web server đã start tại port {port}", flush=True)
+    print(
+        f"Web server đã start tại port {port}",
+        flush=True
+    )
 
 
 # =========================
@@ -88,93 +91,87 @@ async def start_web_server():
 
 def clean_ai_response(answer: str) -> str:
     """
-    Xóa các dạng thinking/reasoning mà model có thể trả về.
+    Loại bỏ thinking/reasoning nếu model vẫn vô tình trả ra.
     """
 
     if not answer:
         return ""
 
-    # ---------------------------------
+    # =================================
     # <think>...</think>
-    # ---------------------------------
+    # =================================
 
-    answer = re.sub(
-        r"<think>.*?</think>",
-        "",
+    match = re.search(
+        r"<think>.*?</think>\s*(.*)",
         answer,
         flags=re.DOTALL | re.IGNORECASE
     )
 
-    # ---------------------------------
+    if match:
+        answer = match.group(1)
+
+    else:
+        # <think> không đóng
+        match = re.search(
+            r"<think>",
+            answer,
+            flags=re.IGNORECASE
+        )
+
+        if match:
+            # Không có final answer rõ ràng.
+            # Tuyệt đối không gửi thinking.
+            return ""
+
+    # =================================
     # <reasoning>...</reasoning>
-    # ---------------------------------
+    # =================================
 
-    answer = re.sub(
-        r"<reasoning>.*?</reasoning>",
-        "",
+    match = re.search(
+        r"<reasoning>.*?</reasoning>\s*(.*)",
         answer,
         flags=re.DOTALL | re.IGNORECASE
     )
 
-    # ---------------------------------
+    if match:
+        answer = match.group(1)
+
+    else:
+        match = re.search(
+            r"<reasoning>",
+            answer,
+            flags=re.IGNORECASE
+        )
+
+        if match:
+            return ""
+
+    # =================================
     # <analysis>...</analysis>
-    # ---------------------------------
+    # =================================
 
-    answer = re.sub(
-        r"<analysis>.*?</analysis>",
-        "",
+    match = re.search(
+        r"<analysis>.*?</analysis>\s*(.*)",
         answer,
         flags=re.DOTALL | re.IGNORECASE
     )
 
-    # ---------------------------------
-    # Trường hợp <think> không đóng
-    # ---------------------------------
+    if match:
+        answer = match.group(1)
 
-    think_match = re.search(
-        r"<think>",
-        answer,
-        flags=re.IGNORECASE
-    )
+    else:
+        match = re.search(
+            r"<analysis>",
+            answer,
+            flags=re.IGNORECASE
+        )
 
-    if think_match:
-        answer = answer[:think_match.start()]
+        if match:
+            return ""
 
-    # ---------------------------------
-    # Trường hợp <reasoning> không đóng
-    # ---------------------------------
-
-    reasoning_match = re.search(
-        r"<reasoning>",
-        answer,
-        flags=re.IGNORECASE
-    )
-
-    if reasoning_match:
-        answer = answer[:reasoning_match.start()]
-
-    # ---------------------------------
-    # Trường hợp <analysis> không đóng
-    # ---------------------------------
-
-    analysis_match = re.search(
-        r"<analysis>",
-        answer,
-        flags=re.IGNORECASE
-    )
-
-    if analysis_match:
-        answer = answer[:analysis_match.start()]
-
-    # ---------------------------------
-    # Một số model dùng:
-    #
-    # Thinking:
-    # ...
-    #
-    # Answer:
-    # ...
-    # ---------------------------------
+    # =================================
+    # Thinking: ... Answer:
+    # =================================
 
     answer = re.sub(
         r"^\s*(thinking|reasoning|chain\s+of\s+thought)\s*:.*?"
@@ -184,9 +181,9 @@ def clean_ai_response(answer: str) -> str:
         flags=re.DOTALL | re.IGNORECASE
     )
 
-    # ---------------------------------
-    # Nếu còn "Answer:" ở đầu
-    # ---------------------------------
+    # =================================
+    # Answer: / Final:
+    # =================================
 
     answer = re.sub(
         r"^\s*(answer|final)\s*:\s*",
@@ -195,13 +192,7 @@ def clean_ai_response(answer: str) -> str:
         flags=re.IGNORECASE
     )
 
-    # ---------------------------------
-    # Dọn khoảng trắng
-    # ---------------------------------
-
-    answer = answer.strip()
-
-    return answer
+    return answer.strip()
 
 
 # =========================
@@ -304,7 +295,10 @@ async def on_message(message):
 
     prompt = message.content
 
-    # Xóa mention bot
+    # =========================
+    # XÓA MENTION BOT
+    # =========================
+
     if bot.user:
 
         prompt = prompt.replace(
@@ -312,13 +306,11 @@ async def on_message(message):
             ""
         )
 
-        # Xóa <@ID>
         prompt = prompt.replace(
             f"<@{bot.user.id}>",
             ""
         )
 
-        # Xóa <@!ID>
         prompt = prompt.replace(
             f"<@!{bot.user.id}>",
             ""
@@ -365,7 +357,6 @@ async def on_message(message):
     channel_id = message.channel.id
 
     if channel_id not in chat_history:
-
         chat_history[channel_id] = []
 
     # =========================
@@ -380,7 +371,7 @@ async def on_message(message):
     )
 
     # =========================
-    # GIỮ HISTORY TRONG GIỚI HẠN
+    # GIỮ HISTORY
     # =========================
 
     if len(chat_history[channel_id]) > MAX_HISTORY:
@@ -427,22 +418,16 @@ async def on_message(message):
             "Sử dụng emoji Discord theo ngữ cảnh: "
 
             "<:skirkmeow:1471088875106730106> khi dễ thương, "
-
             "<:skirkheart:1471089365500559455> khi yêu thương, "
-
             "<:skirksmile:1471089210881478768> khi vui, "
-
             "<:skirkangry:1471089056975687814> khi giận. "
 
             "Chỉ dùng emoji khi thực sự phù hợp, không spam. "
 
-            "Không được hiển thị quá trình suy nghĩ, "
-            "reasoning, phân tích nội bộ hoặc chain-of-thought "
-            "cho người dùng. "
+            "Không hiển thị reasoning, thinking, "
+            "phân tích nội bộ hoặc chain-of-thought. "
 
-            "Chỉ trả về câu trả lời cuối cùng. "
-
-            "/no_think"
+            "Chỉ trả về câu trả lời cuối cùng."
         )
 
         # =========================
@@ -451,13 +436,30 @@ async def on_message(message):
 
         response = await asyncio.to_thread(
             ai.chat.completions.create,
+
             model="qwen/qwen3.6-27b",
+
             messages=[
                 {
                     "role": "system",
                     "content": system_prompt,
                 }
             ] + chat_history[channel_id],
+
+            # =========================
+            # TẮT THINKING
+            # =========================
+
+            reasoning_effort="none",
+
+            # Không đưa reasoning ra content
+            reasoning_format="hidden",
+
+            # Thiết lập phù hợp non-thinking
+            temperature=0.7,
+            top_p=0.80,
+
+            max_completion_tokens=2048,
         )
 
         # =========================
@@ -476,7 +478,10 @@ async def on_message(message):
             flush=True
         )
 
-        # Nếu SDK/model có reasoning_content
+        # =========================
+        # DEBUG REASONING
+        # =========================
+
         reasoning_content = getattr(
             ai_message,
             "reasoning_content",
@@ -486,8 +491,8 @@ async def on_message(message):
         if reasoning_content:
 
             print(
-                "AI REASONING:",
-                repr(reasoning_content),
+                "AI REASONING ĐÃ BỊ ẨN:",
+                "[hidden]",
                 flush=True
             )
 
@@ -498,7 +503,7 @@ async def on_message(message):
         answer = ai_message.content or ""
 
         # =========================
-        # XÓA THINKING
+        # XÓA THINKING DỰ PHÒNG
         # =========================
 
         answer = clean_ai_response(answer)
@@ -514,7 +519,7 @@ async def on_message(message):
         )
 
         # =========================
-        # GIỚI HẠN DISCORD 2000 KÝ TỰ
+        # GIỚI HẠN DISCORD
         # =========================
 
         if len(answer) > 2000:
@@ -530,8 +535,18 @@ async def on_message(message):
 
         if not answer.strip():
 
+            print(
+                "AI KHÔNG CÓ FINAL ANSWER",
+                flush=True
+            )
+
+            # Xóa user message vừa thêm
+            # để thinking/rỗng không ảnh hưởng memory
+            if chat_history[channel_id]:
+                chat_history[channel_id].pop()
+
             await message.channel.send(
-                "Chị Cá không biết trả lời sao 😅"
+                "Chị Cá bị khựng một chút 😅"
             )
 
             return
