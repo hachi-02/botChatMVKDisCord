@@ -135,19 +135,22 @@ def parse_remind_time(text: str):
 async def remind_checker():
     await bot.wait_until_ready()
     while not bot.is_closed():
-        now = datetime.now()
-        ready_reminds = [r for r in remind_queue if r["time"] <= now]
-        for r in ready_reminds:
-            remind_queue.remove(r)
-            try:
-                user = await bot.fetch_user(r["user_id"])
-                channel = bot.get_channel(r["channel_id"])
-                if channel:
-                    await channel.send(
-                        f"{user.mention} Em ơi, chị nhắc nè: **{r['task']}** 🐟",
-                    )
-            except Exception as e:
-                print(f"LỖI REMIND: {e}", flush=True)
+        try:
+            now = datetime.now(ZoneInfo("Asia/Ho_Chi_Minh"))
+            ready_reminds = [r for r in remind_queue if r["time"] <= now]
+            for r in ready_reminds:
+                remind_queue.remove(r)
+                try:
+                    user = await bot.fetch_user(r["user_id"])
+                    channel = bot.get_channel(r["channel_id"])
+                    if channel:
+                        await channel.send(
+                            f"{user.mention} Em ơi, chị nhắc nè: **{r['task']}** 🐟",
+                        )
+                except Exception as e:
+                    print(f"LỖI REMIND: {e}", flush=True)
+        except Exception as e:
+            print(f"LỖI REMIND_CHECKER: {e}", flush=True)
         await asyncio.sleep(10)
 
 
@@ -318,10 +321,11 @@ async def on_message(message):
             prompt = f"[TỰ ĐỘNG] {message.content}"
             sender_name = message.author.display_name or message.author.name
 
-            is_chui = False
-            is_provoked = False
-
-    is_chui = any(kw in content_lower for kw in CHUI_KEYWORDS)
+    is_chui = (
+        bot_mentioned
+        or role_mentioned
+        or any(kw in content_lower for kw in KEYWORDS)
+    ) and any(kw in content_lower for kw in CHUI_KEYWORDS)
     is_provoked = any(kw in content_lower for kw in PROVOCATION_KEYWORDS)
 
     prompt = message.content
@@ -420,7 +424,7 @@ async def on_message(message):
         answer = ai_message.content or ""
         answer = clean_ai_response(answer)
 
-        # Fix emoji format thiếu <
+        # Fix emoji format thiếu 
         answer = re.sub(r"\[:([a-z]+:\d+)\]", r"<:\1>", answer)
         answer = re.sub(r"(?<!<)(:([a-z]+:\d+):)", r"<\1>", answer)
 

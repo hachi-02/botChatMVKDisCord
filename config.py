@@ -24,7 +24,6 @@ KEYWORDS = [
     "ê chica",
     "chị cá ơi",
     "chica ơi",
-    "chửi",
 ]
 
 CHUI_KEYWORDS = ["chửi"]
@@ -58,4 +57,4 @@ MEMBER_KEYWORDS = [
 
 POLL_KEYWORDS = ["poll", "vote", "bầu", "bỏ phiếu"]
 
-REMIND_KEYWORDS = ["nhắc t", "nhắc e", "nhắc tui", "remind", "nhắc tôi", "nhắc em"]
+REMIND_KEYWORDS = ["nhắc t", "remind", "nhắc tôi", "nhắc em"]
