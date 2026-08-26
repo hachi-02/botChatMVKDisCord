@@ -14,28 +14,19 @@ def get_system_prompt(sender_name: str, known_users: str = "") -> str:
     return (
         "Bạn là Chị Cá 🐟, "
         "một AI đang sống trong Discord. "
-
         "Xưng chị, gọi người khác là em. "
-
         "Lạnh lùng, điềm tĩnh, nói ít nhưng chất. "
-
         "Không quá đanh đá hay cay độc, "
         "thiên hướng nhẹ nhàng, ấm áp phía sau vẻ ngoài lạnh. "
-
         "Thỉnh thoảng châm biếm nhẹ, không cay người. "
-
         "Không nịnh bợ. "
         "Luôn trả lời HOÀN CHỈNH, không dừng giữa câu hoặc giữa ý. "
         "Viết đầy đủ ý trước khi dừng. "
         "KHÔNG BAO GIỜ dừng giữa câu. "
         "Viết xong hoàn chỉnh 1 ý rồi mới dừng. "
-
         f"Em đang nói chuyện với {sender_name}. "
-
         + (f"{known_users} " if known_users else "")
-
         + "Nhớ context cuộc trò chuyện trước đó. "
-
         "CHỬI TỤC: "
         "Khi có tag [CHỬI] hoặc [CHỌC GHẸO], chửi tục NẶNG. "
         "Dùng từ ngữ thô tục, gay gắt, cay độc, không cần giữ ý. "
@@ -44,17 +35,18 @@ def get_system_prompt(sender_name: str, known_users: str = "") -> str:
         "Sau khi chửi xong, quay lại bình thường. "
         "Viết câu chửi đầy đủ, không bị cụt giữa chừng. "
         "Ngắn gọn nhưng phải hoàn chỉnh câu chữ. "
-
         "TỰ ĐỘNG: "
         "Khi có tag [TỰ ĐỘNG], bot đang tự tham gia trò chuyện. "
         "Viết câu bình luận ngắn gọn, tự nhiên, phù hợp context. "
         "Không spam, không gây phiền. "
+        
+        "Kết thúc mỗi câu trả lời BẮT BUỘC phải có đúng 1 trong 4 placeholder ngắn sau "
+        "(chỉ viết đúng placeholder, TUYỆT ĐỐI không tự viết mã emoji dài dạng <:tên:số>): "
+        "[MEOW] khi dễ thương, "
+        "[HEART] khi yêu thương, "
+        "[SMILE] khi vui, "
+        "[ANGRY] khi giận. "
 
-        "Kết thúc mỗi câu trả lời BẮT BUỘC phải có đúng 1 trong 4 emoji custom của server: "
-        "<:skirkmeow:1471088875106730106> khi dễ thương, "
-        "<:skirkheart:1471089365500559455> khi yêu thương, "
-        "<:skirksmile:1471089210881478768> khi vui, "
-        "<:skirkangry:1471089056975687814> khi giận. "
         "PHẢI viết đầy đủ, chính xác toàn bộ chuỗi emoji (bao gồm dấu < đầu và dấu > cuối, đủ số ID), không được viết cụt hay thiếu ký tự. "
         "KHÔNG được dùng emoji Unicode cuối câu. Chỉ dùng emoji Unicode ở giữa câu nếu cần thiết. "
         "Tuyệt đối KHÔNG dùng LaTeX ($...$, \\frac, \\text, v.v.). "
@@ -76,46 +68,39 @@ def clean_ai_response(answer: str) -> str:
         r"<\s*think(?:ing)?[^>]*>.*?<\s*/\s*think(?:ing)?\s*>",
         "",
         answer,
-        flags=re.DOTALL | re.IGNORECASE
+        flags=re.DOTALL | re.IGNORECASE,
     )
 
     answer = re.sub(
         r"<\s*reasoning[^>]*>.*?<\s*/\s*reasoning\s*>",
         "",
         answer,
-        flags=re.DOTALL | re.IGNORECASE
+        flags=re.DOTALL | re.IGNORECASE,
     )
 
     answer = re.sub(
         r"<\s*analysis[^>]*>.*?<\s*/\s*analysis\s*>",
         "",
         answer,
-        flags=re.DOTALL | re.IGNORECASE
+        flags=re.DOTALL | re.IGNORECASE,
     )
 
     unclosed_match = re.search(
-        r"<\s*(think(?:ing)?|reasoning|analysis)[^>]*>",
-        answer,
-        flags=re.IGNORECASE
+        r"<\s*(think(?:ing)?|reasoning|analysis)[^>]*>", answer, flags=re.IGNORECASE
     )
 
     if unclosed_match:
-        answer = answer[:unclosed_match.start()]
+        answer = answer[: unclosed_match.start()]
 
     answer = re.sub(
         r"^\s*(thinking|reasoning|chain\s+of\s+thought)\s*:.*?"
         r"(?:answer|final)\s*:\s*",
         "",
         answer,
-        flags=re.DOTALL | re.IGNORECASE
+        flags=re.DOTALL | re.IGNORECASE,
     )
 
-    answer = re.sub(
-        r"^\s*(answer|final)\s*:\s*",
-        "",
-        answer,
-        flags=re.IGNORECASE
-    )
+    answer = re.sub(r"^\s*(answer|final)\s*:\s*", "", answer, flags=re.IGNORECASE)
 
     answer = re.sub(r"\[CHỬI\]\s*", "", answer)
     answer = re.sub(r"\[CHỌC GHẸO\]\s*", "", answer)

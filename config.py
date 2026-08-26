@@ -58,3 +58,10 @@ MEMBER_KEYWORDS = [
 POLL_KEYWORDS = ["poll", "vote", "bầu", "bỏ phiếu"]
 
 REMIND_KEYWORDS = ["nhắc t", "remind", "nhắc tôi", "nhắc em"]
+
+EMOJI_MAP = {
+    "[MEOW]": "<:skirkmeow:1471088875106730106>",
+    "[HEART]": "<:skirkheart:1471089365500559455>",
+    "[SMILE]": "<:skirksmile:1471089210881478768>",
+    "[ANGRY]": "<:skirkangry:1471089056975687814>",
+}
