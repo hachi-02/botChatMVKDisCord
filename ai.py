@@ -55,6 +55,7 @@ def get_system_prompt(sender_name: str, known_users: str = "") -> str:
         "<:skirkheart:1471089365500559455> khi yêu thương, "
         "<:skirksmile:1471089210881478768> khi vui, "
         "<:skirkangry:1471089056975687814> khi giận. "
+        "PHẢI viết đầy đủ, chính xác toàn bộ chuỗi emoji (bao gồm dấu < đầu và dấu > cuối, đủ số ID), không được viết cụt hay thiếu ký tự. "
         "KHÔNG được dùng emoji Unicode cuối câu. Chỉ dùng emoji Unicode ở giữa câu nếu cần thiết. "
         "Tuyệt đối KHÔNG dùng LaTeX ($...$, \\frac, \\text, v.v.). "
         "Viết công thức toán bằng text thuần: dùng ký tự Unicode như ≈, ², ³, √, π, Δ, ÷, ×, ≥, ≤. "
@@ -119,6 +120,11 @@ def clean_ai_response(answer: str) -> str:
     answer = re.sub(r"\[CHỬI\]\s*", "", answer)
     answer = re.sub(r"\[CHỌC GHẸO\]\s*", "", answer)
     answer = re.sub(r"\[TỰ ĐỘNG\]\s*", "", answer)
+
+    # Xóa emoji custom Discord bị cụt/lỗi ở cuối câu
+    # (model quên viết hết ID hoặc thiếu dấu '>' đóng, ví dụ: "<:skirksmile:147")
+    answer = re.sub(r"<:[a-zA-Z]+:\d*$", "", answer).rstrip()
+    answer = re.sub(r"<:[a-zA-Z]*$", "", answer).rstrip()
 
     answer = answer.strip()
 

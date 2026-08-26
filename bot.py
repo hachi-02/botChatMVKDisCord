@@ -428,12 +428,10 @@ async def on_message(message):
         answer = re.sub(r"\[:([a-z]+:\d+)\]", r"<:\1>", answer)
         answer = re.sub(r"(?<!<)(:([a-z]+:\d+):)", r"<\1>", answer)
 
-        # Fix response bi cut giua chung — chi them ... neu KHONG ket thuc bang custom emoji
-        emoji_pattern = re.compile(r"<:[a-z]+:\d+>$")
-        if answer and not emoji_pattern.search(answer.rstrip()):
-            last_line = answer.rstrip().split("\n")[-1]
-            if len(last_line) < 50:
-                answer = answer.rstrip() + "..."
+        # Chỉ thêm "..." khi bị cắt THẬT SỰ do hết token (finish_reason == "length"),
+        # không đoán mò dựa vào việc câu có kết thúc bằng emoji hay không.
+        if answer and finish_reason == "length":
+            answer = answer.rstrip() + "..."
 
         print("AI CLEAN:", repr(answer), flush=True)
 
