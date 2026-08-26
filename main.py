@@ -59,6 +59,14 @@ ydl_opts = {
     "no_warnings": True,
     "extract_flat": False,
     "default_search": "ytsearch1",
+    "extractor_args": {
+        "youtube": {
+            "player_client": ["ios", "web_creator"],
+        }
+    },
+    "http_headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    },
 }
 
 # =========================
@@ -467,6 +475,14 @@ async def on_message(message):
                 "no_warnings": True,
                 "default_search": "ytsearch1",
                 "noplaylist": True,
+                "extractor_args": {
+                    "youtube": {
+                        "player_client": ["ios", "web_creator"],
+                    }
+                },
+                "http_headers": {
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+                },
             }
 
             with yt_dlp.YoutubeDL(search_opts) as ydl:
