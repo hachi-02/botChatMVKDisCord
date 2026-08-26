@@ -1,4 +1,5 @@
 import asyncio
+import re
 
 import discord
 
@@ -111,6 +112,9 @@ async def on_message(message):
 
         answer = ai_message.content or ""
         answer = clean_ai_response(answer)
+
+        # Fix emoji format thiếu <
+        answer = re.sub(r"(?<!<):([a-z]+:\d+>)", r"<:\1", answer)
 
         print("AI CLEAN:", repr(answer), flush=True)
 
