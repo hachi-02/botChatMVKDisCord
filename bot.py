@@ -211,7 +211,7 @@ async def on_message(message):
     is_poll = any(kw in content_lower for kw in POLL_KEYWORDS)
     if is_poll:
         raw = prompt
-        raw = re.sub(r"(?i)^(poll|vote|bầu|bỏ\s*phiếu)\s*", "", raw).strip()
+        raw = re.sub(r"(?i)^(chị\s*cá|chica|poll|vote|bầu|bỏ\s*phiếu)\s*", "", raw).strip()
         options = [o.strip() for o in re.split(r"\||;", raw) if o.strip()]
 
         if len(options) < 2:
@@ -242,7 +242,7 @@ async def on_message(message):
     is_remind = any(kw in content_lower for kw in REMIND_KEYWORDS)
     if is_remind:
         raw = prompt
-        raw = re.sub(r"(?i)^(nhắc\s*(t|tôi|em)|remind)\s*", "", raw).strip()
+        raw = re.sub(r"(?i)^(chị\s*cá|chica|nhắc\s*(t|tôi|em)|remind)\s*", "", raw).strip()
 
         remind_time = parse_remind_time(raw)
         if not remind_time:
