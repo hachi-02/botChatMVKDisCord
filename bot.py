@@ -426,6 +426,21 @@ async def on_message(message):
         answer = clean_ai_response(answer)
 
         # Map placeholder ngắn ([MEOW], [HEART], [SMILE], [ANGRY]) sang emoji thật
+        NAME_TO_PLACEHOLDER = {
+            "meow": "[MEOW]", "skirkmeow": "[MEOW]",
+            "heart": "[HEART]", "skirkheart": "[HEART]",
+            "smile": "[SMILE]", "skirksmile": "[SMILE]",
+            "angry": "[ANGRY]", "skirkangry": "[ANGRY]",
+        }
+
+        def _normalize_placeholder(match):
+            name = match.group(1).lower()
+            return NAME_TO_PLACEHOLDER.get(name, match.group(0))
+
+        answer = re.sub(r"\[:?([a-zA-Z]+):?\]", _normalize_placeholder, answer)
+        answer = re.sub(r"(?<![\[\w]):([a-zA-Z]+):(?!\])", _normalize_placeholder, answer)
+
+        # Map placeholder chuẩn ([MEOW], [HEART], [SMILE], [ANGRY]) sang emoji thật
         for placeholder, emoji in EMOJI_MAP.items():
             answer = answer.replace(placeholder, emoji)
 
