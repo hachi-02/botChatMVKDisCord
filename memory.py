@@ -4,6 +4,9 @@ chat_history = {}
 
 
 def add_message(channel_id: int, role: str, content: str):
+    if role == "assistant" and len(content) > 500:
+        content = content[:500] + "..."
+
     if channel_id not in chat_history:
         chat_history[channel_id] = []
 

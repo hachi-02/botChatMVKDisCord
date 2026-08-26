@@ -11,7 +11,7 @@ ROLE_ID = 1541912537744936983
 
 MODEL_NAME = "qwen/qwen3.8-27b"
 
-MAX_HISTORY = 20
+MAX_HISTORY = 10
 
 KEYWORDS = [
     "chị cá",
