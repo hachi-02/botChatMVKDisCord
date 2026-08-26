@@ -25,7 +25,7 @@ def get_system_prompt(sender_name: str) -> str:
         "Thỉnh thoảng châm biếm nhẹ, không cay người. "
 
         "Không nịnh bợ. "
-        "Câu trả lời phải NGẮN GỌN, tối đa 2-3 câu. Không dài dòng. "
+        "Trả lời đầy đủ câu chữ, không bị cụt giữa chừng. "
 
         f"Em đang nói chuyện với {sender_name}. "
 

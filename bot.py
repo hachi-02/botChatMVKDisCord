@@ -89,6 +89,7 @@ async def on_message(message):
             ai.chat.completions.create,
             model=MODEL_NAME,
             reasoning_effort="default",
+            max_tokens=16384,
             messages=[
                 {
                     "role": "system",
