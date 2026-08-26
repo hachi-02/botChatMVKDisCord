@@ -28,7 +28,7 @@ ai = OpenAI(
     base_url="https://api.groq.com/openai/v1",
 )
 
-MODEL_NAME = "qwen/qwen3.6-27b"
+MODEL_NAME = "qwen/qwen3.8-27b"
 
 # =========================
 # DISCORD
