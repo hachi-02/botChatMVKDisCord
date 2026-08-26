@@ -267,7 +267,8 @@ async def on_message(message):
                         "<:skirkheart:1471089365500559455> khi yêu thương, "
                         "<:skirksmile:1471089210881478768> khi vui, "
                         "<:skirkangry:1471089056975687814> khi giận. "
-                        "Chỉ dùng emoji khi thực sự phù hợp, không spam."
+                        "Chỉ dùng emoji khi thực sự phù hợp, không spam. "
+                        "/no_think"
                     ),
                 },
             ] + chat_history[channel_id],
@@ -275,19 +276,13 @@ async def on_message(message):
 
         answer = response.choices[0].message.content or ""
 
-        # Xóa thinking tags và thinking leak
+        # Xóa thinking
         answer = re.sub(r"<think>.*?</think>", "", answer, flags=re.DOTALL).strip()
         answer = re.sub(r"<reasoning>.*?</reasoning>", "", answer, flags=re.DOTALL).strip()
-        # Xóa nếu bắt đầu bằng "Okay" hoặc "Let me" (thinking leak)
-        lines = answer.split("\n")
-        clean_lines = []
-        skip = True
-        for line in lines:
-            if skip and any(line.strip().startswith(x) for x in ["Okay,", "Let me", "The user", "Here's", "I need", "Thinking", "Alright"]):
-                continue
-            skip = False
-            clean_lines.append(line)
-        answer = "\n".join(clean_lines).strip()
+        # Nếu vẫn leak → lấy phần sau cùng
+        if "<think>" in answer or "Let me" in answer[:50]:
+            parts = re.split(r"</think>", answer)
+            answer = parts[-1].strip() if len(parts) > 1 else answer
 
         # Nếu vẫn còn quá dài → cắt ngắn
         if len(answer) > 2000:
