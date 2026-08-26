@@ -129,6 +129,12 @@ async def on_message(message):
         # Fix emoji format thiếu <
         answer = re.sub(r"\[:([a-z]+:\d+)\]", r"<:\1>", answer)
 
+        # Fix response bi cut giua chung
+        if answer and not answer.rstrip().endswith((".", "!", "?", "...", ":", "😂", "🐟")):
+            last_line = answer.rstrip().split("\n")[-1]
+            if len(last_line) < 50:
+                answer = answer.rstrip() + "..."
+
         print("AI CLEAN:", repr(answer), flush=True)
 
         if len(answer) > 2000:

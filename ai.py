@@ -27,6 +27,8 @@ def get_system_prompt(sender_name: str) -> str:
         "Không nịnh bợ. "
         "Luôn trả lời HOÀN CHỈNH, không dừng giữa câu hoặc giữa ý. "
         "Viết đầy đủ ý trước khi dừng. "
+        "KHÔNG BAO GIỜ dừng giữa câu. "
+        "Viết xong hoàn chỉnh 1 ý rồi mới dừng. "
 
         f"Em đang nói chuyện với {sender_name}. "
 
