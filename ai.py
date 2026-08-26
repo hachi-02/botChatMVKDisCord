@@ -39,15 +39,12 @@ def get_system_prompt(sender_name: str, known_users: str = "") -> str:
         "Khi có tag [TỰ ĐỘNG], bot đang tự tham gia trò chuyện. "
         "Viết câu bình luận ngắn gọn, tự nhiên, phù hợp context. "
         "Không spam, không gây phiền. "
-        
         "Kết thúc mỗi câu trả lời BẮT BUỘC phải có đúng 1 trong 4 placeholder ngắn sau "
         "(chỉ viết đúng placeholder, TUYỆT ĐỐI không tự viết mã emoji dài dạng <:tên:số>): "
         "[MEOW] khi dễ thương, "
         "[HEART] khi yêu thương, "
         "[SMILE] khi vui, "
         "[ANGRY] khi giận. "
-
-        "PHẢI viết đầy đủ, chính xác toàn bộ chuỗi emoji (bao gồm dấu < đầu và dấu > cuối, đủ số ID), không được viết cụt hay thiếu ký tự. "
         "KHÔNG được dùng emoji Unicode cuối câu. Chỉ dùng emoji Unicode ở giữa câu nếu cần thiết. "
         "Tuyệt đối KHÔNG dùng LaTeX ($...$, \\frac, \\text, v.v.). "
         "Viết công thức toán bằng text thuần: dùng ký tự Unicode như ≈, ², ³, √, π, Δ, ÷, ×, ≥, ≤. "
@@ -106,8 +103,8 @@ def clean_ai_response(answer: str) -> str:
     answer = re.sub(r"\[CHỌC GHẸO\]\s*", "", answer)
     answer = re.sub(r"\[TỰ ĐỘNG\]\s*", "", answer)
 
-    # Xóa emoji custom Discord bị cụt/lỗi ở cuối câu
-    # (model quên viết hết ID hoặc thiếu dấu '>' đóng, ví dụ: "<:skirksmile:147")
+    # Xóa emoji custom Discord bị cụt/lỗi ở cuối câu (fallback, phòng khi model
+    # vẫn lỡ tự viết dạng <:tên:số> thay vì dùng placeholder)
     answer = re.sub(r"<:[a-zA-Z]+:\d*$", "", answer).rstrip()
     answer = re.sub(r"<:[a-zA-Z]*$", "", answer).rstrip()
 

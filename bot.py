@@ -19,6 +19,7 @@ from config import (
     MEMBER_KEYWORDS,
     POLL_KEYWORDS,
     REMIND_KEYWORDS,
+    EMOJI_MAP,
 )
 from ai import ai, get_system_prompt, clean_ai_response
 from memory import add_message, get_history, remember_user, get_known_users
@@ -424,12 +425,15 @@ async def on_message(message):
         answer = ai_message.content or ""
         answer = clean_ai_response(answer)
 
-        # Fix emoji format thiếu 
-        answer = re.sub(r"\[:([a-z]+:\d+)\]", r"<:\1>", answer)
-        answer = re.sub(r"(?<!<)(:([a-z]+:\d+):)", r"<\1>", answer)
+        # Map placeholder ngắn ([MEOW], [HEART], [SMILE], [ANGRY]) sang emoji thật
+        for placeholder, emoji in EMOJI_MAP.items():
+            answer = answer.replace(placeholder, emoji)
 
-        # Chỉ thêm "..." khi bị cắt THẬT SỰ do hết token (finish_reason == "length"),
-        # không đoán mò dựa vào việc câu có kết thúc bằng emoji hay không.
+        # Fallback: fix nếu model lỡ viết sai format cũ dạng <:tên:số>
+        answer = re.sub(r"\[:([a-z]+:\d+)\]", r"<:\1>", answer)
+        answer = re.sub(r"(?<!<):([a-z]+):(\d+):", r"<:\1:\2>", answer)
+
+        # Chỉ thêm "..." khi bị cắt THẬT SỰ do hết token (finish_reason == "length")
         if answer and finish_reason == "length":
             answer = answer.rstrip() + "..."
 
