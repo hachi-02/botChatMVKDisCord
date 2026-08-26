@@ -206,8 +206,12 @@ async def on_message(message):
         answer = re.sub(r"\[:([a-z]+:\d+)\]", r"<:\1>", answer)
         answer = re.sub(r"(?<!<)(:([a-z]+:\d+):)", r"<\1>", answer)
 
-        # Fix response bi cut giua chung
-        if answer and not answer.rstrip().endswith((".", "!", "?", "...", "\"", "😂", "🐟", ">")):
+        # Fix response bi cut giua chung — chi them ... neu KHONG ket thuc bang custom emoji
+        emoji_pattern = re.compile(r"<:[a-z]+:\d+>$")
+        if answer and not emoji_pattern.search(answer.rstrip()):
+            last_line = answer.rstrip().split("\n")[-1]
+            if len(last_line) < 50:
+                answer = answer.rstrip() + "..."
             last_line = answer.rstrip().split("\n")[-1]
             if len(last_line) < 50:
                 answer = answer.rstrip() + "..."
