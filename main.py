@@ -1,10 +1,12 @@
 import os
 import re
+import httpx2
 
 import discord
 from dotenv import load_dotenv
 from openai import OpenAI
 from aiohttp import web
+from duckduckgo_search import DDGS
 
 load_dotenv()
 
@@ -187,6 +189,53 @@ async def on_message(message):
         await message.channel.send(
             "M gọi Chị Cá đó hả? 🐟"
         )
+        return
+
+    # =========================
+    # LỆNH ĐẶC BIỆT
+    # =========================
+
+    prompt_lower = prompt.lower().strip()
+
+    # --- PING ---
+    if prompt_lower in ["ping", "chị cá ping", "chica ping"]:
+        latency = round(bot.latency * 1000)
+        await message.channel.send(f"Pong! {latency}ms")
+        return
+
+    # --- TÌM KIẾM ---
+    if prompt_lower.startswith("tìm ") or prompt_lower.startswith("search "):
+        query = prompt.split(" ", 1)[1] if " " in prompt else ""
+        if not query:
+            await message.channel.send("Gõ gì đi chị mới tìm được.")
+            return
+        try:
+            with DDGS() as ddgs:
+                results = list(ddgs.text(query, max_results=3))
+            if not results:
+                await message.channel.send("Không tìm thấy gì cả.")
+                return
+            msg = f"**Kết quả tìm \"{query}\":**\n\n"
+            for i, r in enumerate(results, 1):
+                msg += f"**{i}. {r['title']}**\n{r['href']}\n{r['body'][:100]}...\n\n"
+            await message.channel.send(msg[:2000])
+        except Exception as e:
+            print(f"LỖI SEARCH: {e}", flush=True)
+            await message.channel.send("Lỗi tìm kiếm rồi.")
+        return
+
+    # --- THỜI TIẾT ---
+    if prompt_lower.startswith("thời tiết ") or prompt_lower.startswith("weather "):
+        location = prompt.split(" ", 1)[1] if " " in prompt else ""
+        if not location:
+            await message.channel.send("Nhập địa điểm đi.")
+            return
+        try:
+            r = httpx2.get(f"https://wttr.in/{location}?format=3&lang=vi", timeout=10)
+            await message.channel.send(r.text.strip())
+        except Exception as e:
+            print(f"LỖI WEATHER: {e}", flush=True)
+            await message.channel.send("Lỗi lấy thời tiết rồi.")
         return
 
     # =========================
