@@ -57,6 +57,14 @@ def parse_remind_time(text: str):
             target = target.replace(year=target.year + 1)
         return target
 
+    match = re.search(r"(\d{1,2})/(\d{1,2})\b", text)
+    if match:
+        day, month = int(match.group(1)), int(match.group(2))
+        target = now.replace(day=day, month=month, hour=0, minute=0, second=0, microsecond=0)
+        if target <= now:
+            target = target.replace(year=target.year + 1)
+        return target
+
     match = re.search(r"(\d+)\s*(phút|minute|min|p)(?!\w)", text)
     if match:
         return now + timedelta(minutes=int(match.group(1)))
@@ -210,13 +218,14 @@ async def on_message(message):
                     await message.channel.send(
                         "Em viết chưa rõ thời gian rồi. "
                         "Ví dụ: `nhắc t 30 phút học bài`, `remind 7h đi ngủ`, "
-                        "`nhắc t ngày mai 8h30 dậy`, hoặc `nhắc t 25/12 8h đi chợ` 🐟",
+                        "`nhắc t ngày mai 8h30 dậy`, hoặc `nhắc t 25/12 đi chợ` 🐟",
                         reference=message,
                     )
                     return
 
                 task = re.sub(r"(?:ngày\s*mai|mai)\s*\d+[h:]\d*\b", "", raw, flags=re.IGNORECASE).strip()
                 task = re.sub(r"\d+/\d+\s*\d+[h:]\d*\b", "", task, flags=re.IGNORECASE).strip()
+                task = re.sub(r"\d+/\d+\b", "", task, flags=re.IGNORECASE).strip()
                 task = re.sub(r"\d+\s*(phút|giờ|ngày|giây|min|p|h|hour|day|second|tieng|tiếng)[\s:]*\d*", "", task, flags=re.IGNORECASE).strip()
                 if not task:
                     task = "đến giờ rồi"
