@@ -210,7 +210,13 @@ async def on_message(message):
                         "hơi hài hước và bằng tiếng Việt. "
                         "Không cần nói quá dài. "
                         f"Em đang nói chuyện với {sender_name}. "
-                        "Nhớ context cuộc trò chuyện trước đó."
+                        "Nhớ context cuộc trò chuyện trước đó. "
+                        "Sử dụng emoji Discord theo ngữ cảnh: "
+                        "<:skirkmeow:1471088875106730106> khi dễ thương, "
+                        "<:skirkheart:1471089365500559455> khi yêu thương, "
+                        "<:skirksmile:1471089210881478768> khi vui, "
+                        "<:skirkangry:1471089056975687814> khi giận. "
+                        "Thỉnh thoảng thêm emoji, không cần lúc nào cũng dùng."
                     ),
                 },
             ] + chat_history[channel_id],
