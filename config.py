@@ -34,3 +34,9 @@ PROVOCATION_KEYWORDS = [
     "bạn ngu", "dở", "kém", "tệ", "loser",
     "đồ khùng", "đồ điên", "bẩn", "xấu",
 ]
+
+SEARCH_KEYWORDS = [
+    "tìm", "tra cứu", "thông tin", "là ai", "giới thiệu",
+    "bao nhiêu", "khi nào", "ở đâu", "tại sao", "thế nào",
+    "có thật", "đúng không", "so sánh", "phân biệt",
+]

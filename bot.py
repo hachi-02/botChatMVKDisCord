@@ -3,9 +3,10 @@ import re
 
 import discord
 
-from config import ROLE_ID, KEYWORDS, CHUI_KEYWORDS, PROVOCATION_KEYWORDS, MODEL_NAME
+from config import ROLE_ID, KEYWORDS, CHUI_KEYWORDS, PROVOCATION_KEYWORDS, SEARCH_KEYWORDS, MODEL_NAME
 from ai import ai, get_system_prompt, clean_ai_response
 from memory import add_message, get_history
+from search import search_web
 from web_server import start_web_server
 
 intents = discord.Intents.default()
@@ -72,6 +73,18 @@ async def on_message(message):
         prompt = f"[CHỬI] {prompt}"
     elif is_provoked:
         prompt = f"[CHỌC GHẸO] {prompt}"
+
+    # =========================
+    # TIM KIEM WEB
+    # =========================
+
+    is_search = any(kw in content_lower for kw in SEARCH_KEYWORDS)
+
+    if is_search and not is_chui and not is_provoked:
+        print(f"TÌM KIỂM: {prompt}", flush=True)
+        search_results = await asyncio.to_thread(search_web, prompt)
+        prompt = f"Thông tin tìm được trên mạng:\n{search_results}\n\nCâu hỏi của user: {prompt}"
+        print(f"KẾT QUẢ TÌM KIỂM: {search_results[:200]}...", flush=True)
 
     if not prompt:
         await message.channel.send("M gọi Chị Cá đó hả? 🐟")
