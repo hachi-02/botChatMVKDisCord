@@ -110,7 +110,17 @@ async def on_message(message):
 
     # Không mention bot hoặc role → bỏ qua
     if not bot_mentioned and not role_mentioned:
-        return
+        # Kiểm tra keyword tên bot
+        content_lower = message.content.lower()
+        keywords = [
+            "chị cá", "chica", "chicá",
+            "chị ca", "chica",
+            "cá ơi", "ca ơi",
+            "ê chị cá", "ê chica",
+            "chị cá ơi", "chica ơi",
+        ]
+        if not any(kw in content_lower for kw in keywords):
+            return
 
     # =========================
     # LẤY NỘI DUNG
