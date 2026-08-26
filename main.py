@@ -83,62 +83,125 @@ async def start_web_server():
 
 
 # =========================
-# XỬ LÝ THINKING (FIX LỖI THẺ MỞ KHÔNG ĐÓNG)
+# XỬ LÝ THINKING
 # =========================
 
 def clean_ai_response(answer: str) -> str:
     """
-    Xóa triệt để các dạng thinking/reasoning dù có hay không có thẻ đóng </think>.
+    Xóa các dạng thinking/reasoning mà model có thể trả về.
     """
+
     if not answer:
         return ""
 
-    tags = ["think", "reasoning", "analysis", "thought"]
+    # ---------------------------------
+    # <think>...</think>
+    # ---------------------------------
 
-    # 1. Nếu có đủ cặp thẻ <think>...</think> -> Xóa khối ở giữa
-    for tag in tags:
-        answer = re.sub(rf"<{tag}>[\s\S]*?</{tag}>", "", answer, flags=re.IGNORECASE)
-
-    # 2. Xử lý trường hợp thẻ <think> mở nhưng KHÔNG CÓ thẻ đóng </think>
-    for tag in tags:
-        if f"<{tag}>" in answer.lower():
-            parts = re.split(rf"<{tag}>", answer, flags=re.IGNORECASE)
-            clean_text = parts[0]
-            
-            for part in parts[1:]:
-                if f"</{tag}>" in part.lower():
-                    clean_text += re.split(rf"</{tag}>", part, flags=re.IGNORECASE)[-1]
-                else:
-                    # Trường hợp trôi thẻ đóng hoàn toàn: Tách theo dòng và lọc dòng nháp của AI
-                    lines = part.split("\n")
-                    non_thinking_lines = []
-                    is_thinking = True
-                    
-                    for line in lines:
-                        # Dấu hiệu bắt đầu câu trả lời thực sự (Tiếng Việt hoặc đầu mục)
-                        strip_line = line.strip()
-                        if any(marker in strip_line for marker in ["a)", "b)", "c)", "d)", "1.", "2.", "Gia tốc", "Đáp án", "Chị", "Em"]) and not strip_line.startswith("*"):
-                            is_thinking = False
-                        
-                        if not is_thinking:
-                            non_thinking_lines.append(line)
-                            
-                    clean_text += "\n".join(non_thinking_lines)
-            answer = clean_text
-
-    # 3. Loại bỏ khối markdown code block chứa thinking (VD: ```thinking ... ```)
-    answer = re.sub(r"```(?:thinking|thought|reasoning)[\s\S]*?```", "", answer, flags=re.IGNORECASE)
-
-    # 4. Loại bỏ dạng văn bản: "Thinking:\n...\nAnswer:\n..."
     answer = re.sub(
-        r"^\s*(?:thinking|reasoning|chain\s+of\s+thought)\s*:[\s\S]*?(?:answer|final answer)\s*:\s*",
+        r"<think>.*?</think>",
+        "",
+        answer,
+        flags=re.DOTALL | re.IGNORECASE
+    )
+
+    # ---------------------------------
+    # <reasoning>...</reasoning>
+    # ---------------------------------
+
+    answer = re.sub(
+        r"<reasoning>.*?</reasoning>",
+        "",
+        answer,
+        flags=re.DOTALL | re.IGNORECASE
+    )
+
+    # ---------------------------------
+    # <analysis>...</analysis>
+    # ---------------------------------
+
+    answer = re.sub(
+        r"<analysis>.*?</analysis>",
+        "",
+        answer,
+        flags=re.DOTALL | re.IGNORECASE
+    )
+
+    # ---------------------------------
+    # Trường hợp <think> không đóng
+    # ---------------------------------
+
+    think_match = re.search(
+        r"<think>",
+        answer,
+        flags=re.IGNORECASE
+    )
+
+    if think_match:
+        answer = answer[:think_match.start()]
+
+    # ---------------------------------
+    # Trường hợp <reasoning> không đóng
+    # ---------------------------------
+
+    reasoning_match = re.search(
+        r"<reasoning>",
+        answer,
+        flags=re.IGNORECASE
+    )
+
+    if reasoning_match:
+        answer = answer[:reasoning_match.start()]
+
+    # ---------------------------------
+    # Trường hợp <analysis> không đóng
+    # ---------------------------------
+
+    analysis_match = re.search(
+        r"<analysis>",
+        answer,
+        flags=re.IGNORECASE
+    )
+
+    if analysis_match:
+        answer = answer[:analysis_match.start()]
+
+    # ---------------------------------
+    # Một số model dùng:
+    #
+    # Thinking:
+    # ...
+    #
+    # Answer:
+    # ...
+    # ---------------------------------
+
+    answer = re.sub(
+        r"^\s*(thinking|reasoning|chain\s+of\s+thought)\s*:.*?"
+        r"(?:answer|final)\s*:\s*",
+        "",
+        answer,
+        flags=re.DOTALL | re.IGNORECASE
+    )
+
+    # ---------------------------------
+    # Nếu còn "Answer:" ở đầu
+    # ---------------------------------
+
+    answer = re.sub(
+        r"^\s*(answer|final)\s*:\s*",
         "",
         answer,
         flags=re.IGNORECASE
     )
-    answer = re.sub(r"^\s*(?:answer|final answer)\s*:\s*", "", answer, flags=re.IGNORECASE)
 
-    return answer.strip()
+    # ---------------------------------
+    # Dọn khoảng trắng
+    # ---------------------------------
+
+    answer = answer.strip()
+
+    return answer
 
 
 # =========================
@@ -342,20 +405,44 @@ async def on_message(message):
         # =========================
 
         system_prompt = (
-            "Bạn là Chị Cá 🐟, một AI đang sống trong Discord. "
+            "Bạn là Chị Cá 🐟, "
+            "một AI đang sống trong Discord. "
+
             "Xưng chị, gọi người khác là em. "
+
             "Lạnh lùng, điềm tĩnh, nói ít nhưng chất. "
-            "Không quá đanh đá hay cay độc, thiên hướng nhẹ nhàng, ấm áp phía sau vẻ ngoài lạnh. "
-            "Thỉnh thoảng châm biếm nhẹ, không cay người. Không nịnh bợ. Không cần nói quá dài. "
+
+            "Không quá đanh đá hay cay độc, "
+            "thiên hướng nhẹ nhàng, ấm áp phía sau vẻ ngoài lạnh. "
+
+            "Thỉnh thoảng châm biếm nhẹ, không cay người. "
+
+            "Không nịnh bợ. "
+            "Không cần nói quá dài. "
+
             f"Em đang nói chuyện với {sender_name}. "
+
             "Nhớ context cuộc trò chuyện trước đó. "
+
             "Sử dụng emoji Discord theo ngữ cảnh: "
+
             "<:skirkmeow:1471088875106730106> khi dễ thương, "
+
             "<:skirkheart:1471089365500559455> khi yêu thương, "
+
             "<:skirksmile:1471089210881478768> khi vui, "
+
             "<:skirkangry:1471089056975687814> khi giận. "
+
             "Chỉ dùng emoji khi thực sự phù hợp, không spam. "
-            "Trả lời trực tiếp bằng tiếng Việt, tuyệt đối không xuất các bước suy luận tiếng Anh."
+
+            "Không được hiển thị quá trình suy nghĩ, "
+            "reasoning, phân tích nội bộ hoặc chain-of-thought "
+            "cho người dùng. "
+
+            "Chỉ trả về câu trả lời cuối cùng. "
+
+            "/no_think"
         )
 
         # =========================
@@ -389,6 +476,7 @@ async def on_message(message):
             flush=True
         )
 
+        # Nếu SDK/model có reasoning_content
         reasoning_content = getattr(
             ai_message,
             "reasoning_content",
@@ -404,10 +492,15 @@ async def on_message(message):
             )
 
         # =========================
-        # LẤY CONTENT & CLEAN
+        # LẤY CONTENT
         # =========================
 
         answer = ai_message.content or ""
+
+        # =========================
+        # XÓA THINKING
+        # =========================
+
         answer = clean_ai_response(answer)
 
         # =========================
@@ -444,13 +537,17 @@ async def on_message(message):
             return
 
         # =========================
-        # LOG & GỬI DISCORD
+        # LOG
         # =========================
 
         print(
             f"AI: {answer}",
             flush=True
         )
+
+        # =========================
+        # GỬI DISCORD
+        # =========================
 
         await message.channel.send(
             answer
@@ -466,6 +563,10 @@ async def on_message(message):
                 "content": answer
             }
         )
+
+        # =========================
+        # GIỮ HISTORY
+        # =========================
 
         if len(chat_history[channel_id]) > MAX_HISTORY:
 
