@@ -424,7 +424,7 @@ async def on_message(message):
         response = await asyncio.to_thread(
             ai.chat.completions.create,
             model=MODEL_NAME,
-            max_tokens=1000,
+            max_tokens=800,
             reasoning_effort="default",
             extra_body={"reasoning_format": "hidden"},
             messages=[
