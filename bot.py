@@ -27,7 +27,7 @@ def parse_remind_time(text: str):
     text = text.lower().strip()
     now = datetime.now()
 
-    match = re.search(r"(\d+)\s*(phút|minute|min)", text)
+    match = re.search(r"(\d+)\s*(phút|minute|min|p)(?!\w)", text)
     if match:
         return now + timedelta(minutes=int(match.group(1)))
 
@@ -172,8 +172,9 @@ async def on_message(message):
             if is_remind:
                 raw = message.content
                 raw = re.sub(r"(?i)^(chị\s*cá|chica)\s*", "", raw).strip()
-                raw = re.sub(r"(?i)^(nhắc\s*(t|tôi|em)|remind)\s*", "", raw).strip()
+                raw = re.sub(r"(?i)^(nhắc\s*(t|tôi|em|e|tui)|remind)\s*", "", raw).strip()
 
+                now = datetime.now()
                 remind_time = parse_remind_time(raw)
                 if not remind_time:
                     await message.channel.send(
@@ -183,7 +184,7 @@ async def on_message(message):
                     )
                     return
 
-                task = re.sub(r"\d+\s*(phút|giờ|ngày|giây|min|h|hour|day|second|tieng|tiếng)[\s:]*\d*", "", raw, flags=re.IGNORECASE).strip()
+                task = re.sub(r"\d+\s*(phút|giờ|ngày|giây|min|p|h|hour|day|second|tieng|tiếng)[\s:]*\d*", "", raw, flags=re.IGNORECASE).strip()
                 if not task:
                     task = "đến giờ rồi"
 
@@ -194,7 +195,7 @@ async def on_message(message):
                     "task": task,
                 })
 
-                diff = remind_time - datetime.now()
+                diff = remind_time - now
                 hours, remainder = divmod(int(diff.total_seconds()), 3600)
                 minutes = remainder // 60
                 time_str = ""
