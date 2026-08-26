@@ -452,9 +452,6 @@ async def on_message(message):
 
             reasoning_effort="none",
 
-            # Không đưa reasoning ra content
-            reasoning_format="hidden",
-
             # Thiết lập phù hợp non-thinking
             temperature=0.7,
             top_p=0.80,
