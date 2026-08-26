@@ -1,10 +1,11 @@
 import asyncio
 import random
 import re
+from datetime import datetime, timedelta
 
 import discord
 
-from config import ROLE_ID, KEYWORDS, CHUI_KEYWORDS, PROVOCATION_KEYWORDS, SEARCH_KEYWORDS, PROACTIVE_CHANCE, MIN_MESSAGE_LENGTH, PROACTIVE_KEYWORDS, MODEL_NAME, MEMBER_KEYWORDS
+from config import ROLE_ID, KEYWORDS, CHUI_KEYWORDS, PROVOCATION_KEYWORDS, SEARCH_KEYWORDS, PROACTIVE_CHANCE, MIN_MESSAGE_LENGTH, PROACTIVE_KEYWORDS, MODEL_NAME, MEMBER_KEYWORDS, POLL_KEYWORDS, REMIND_KEYWORDS
 from ai import ai, get_system_prompt, clean_ai_response
 from memory import add_message, get_history, remember_user, get_known_users
 from search import search_web
@@ -17,11 +18,66 @@ intents.message_content = True
 
 bot = discord.Client(intents=intents)
 
+remind_queue = []
+
+NUMBER_EMOJIS = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"]
+
+
+def parse_remind_time(text: str):
+    text = text.lower().strip()
+    now = datetime.now()
+
+    match = re.search(r"(\d+)\s*(phút|minute|min)", text)
+    if match:
+        return now + timedelta(minutes=int(match.group(1)))
+
+    match = re.search(r"(\d+)\s*(giờ|hour|hours|tieng|tiếng|h)", text)
+    if match:
+        return now + timedelta(hours=int(match.group(1)))
+
+    match = re.search(r"(\d+)\s*(ngày|day|ngay)", text)
+    if match:
+        return now + timedelta(days=int(match.group(1)))
+
+    match = re.search(r"(\d+)\s*(giây|second|sec|s)", text)
+    if match:
+        return now + timedelta(seconds=int(match.group(1)))
+
+    match = re.search(r"(\d{1,2})[h:](\d{2})", text)
+    if match:
+        hour, minute = int(match.group(1)), int(match.group(2))
+        target = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+        if target <= now:
+            target += timedelta(days=1)
+        return target
+
+    return None
+
+
+async def remind_checker():
+    await bot.wait_until_ready()
+    while not bot.is_closed():
+        now = datetime.now()
+        ready_reminds = [r for r in remind_queue if r["time"] <= now]
+        for r in ready_reminds:
+            remind_queue.remove(r)
+            try:
+                user = await bot.fetch_user(r["user_id"])
+                channel = bot.get_channel(r["channel_id"])
+                if channel:
+                    await channel.send(
+                        f"{user.mention} Em ơi, chị nhắc nè: **{r['task']}** 🐟",
+                    )
+            except Exception as e:
+                print(f"LỖI REMIND: {e}", flush=True)
+        await asyncio.sleep(10)
+
 
 @bot.event
 async def on_ready():
     print(f"Bot đã online: {bot.user}", flush=True)
     await start_web_server()
+    bot.loop.create_task(remind_checker())
     print("Chị Cá đã sẵn sàng 🐟", flush=True)
 
 
@@ -149,6 +205,81 @@ async def on_message(message):
         return
 
     # =========================
+    # POLL / VOTE
+    # =========================
+
+    is_poll = any(kw in content_lower for kw in POLL_KEYWORDS)
+    if is_poll:
+        raw = prompt
+        raw = re.sub(r"(?i)^(poll|vote|bầu|bỏ\s*phiếu)\s*", "", raw).strip()
+        options = [o.strip() for o in re.split(r"\||;", raw) if o.strip()]
+
+        if len(options) < 2:
+            await message.channel.send(
+                "Em viết chưa đúng format rồi. "
+                "Gõ: `poll pizza | phở | cơm` (phân tách bằng `|`) 🐟",
+                reference=message,
+            )
+            return
+
+        if len(options) > 10:
+            options = options[:10]
+
+        poll_text = f"**POLL: {options[0]}**\n"
+        for i, opt in enumerate(options):
+            poll_text += f"{NUMBER_EMOJIS[i]} {opt}\n"
+        poll_text += f"\nBỏ phiếu bằng cách react số tương ứng! ({sender_name} tạo)"
+
+        poll_msg = await message.channel.send(poll_text)
+        for i in range(len(options)):
+            await poll_msg.add_reaction(NUMBER_EMOJIS[i])
+        return
+
+    # =========================
+    # REMIND
+    # =========================
+
+    is_remind = any(kw in content_lower for kw in REMIND_KEYWORDS)
+    if is_remind:
+        raw = prompt
+        raw = re.sub(r"(?i)^(nhắc\s*(t|tôi|em)|remind)\s*", "", raw).strip()
+
+        remind_time = parse_remind_time(raw)
+        if not remind_time:
+            await message.channel.send(
+                "Em viết chưa rõ thời gian rồi. "
+                "Ví dụ: `nhắc t 30 phút học bài` hoặc `remind 7h đi ngủ` 🐟",
+                reference=message,
+            )
+            return
+
+        task = re.sub(r"\d+\s*(phút|giờ|ngày|giây|min|h|hour|day|second|tieng|tiếng)[\s:]*\d*", "", raw, flags=re.IGNORECASE).strip()
+        if not task:
+            task = "đến giờ rồi"
+
+        remind_queue.append({
+            "user_id": message.author.id,
+            "channel_id": message.channel.id,
+            "time": remind_time,
+            "task": task,
+        })
+
+        diff = remind_time - datetime.now()
+        hours, remainder = divmod(int(diff.total_seconds()), 3600)
+        minutes = remainder // 60
+        time_str = ""
+        if hours > 0:
+            time_str += f"{hours} giờ "
+        if minutes > 0:
+            time_str += f"{minutes} phút"
+
+        await message.channel.send(
+            f"OK em, {time_str} nữa chị sẽ nhắc: **{task}** 🐟",
+            reference=message,
+        )
+        return
+
+    # =========================
     # TIM KIEM WEB
     # =========================
 
@@ -209,9 +340,6 @@ async def on_message(message):
         # Fix response bi cut giua chung — chi them ... neu KHONG ket thuc bang custom emoji
         emoji_pattern = re.compile(r"<:[a-z]+:\d+>$")
         if answer and not emoji_pattern.search(answer.rstrip()):
-            last_line = answer.rstrip().split("\n")[-1]
-            if len(last_line) < 50:
-                answer = answer.rstrip() + "..."
             last_line = answer.rstrip().split("\n")[-1]
             if len(last_line) < 50:
                 answer = answer.rstrip() + "..."

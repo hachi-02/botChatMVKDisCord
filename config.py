@@ -55,3 +55,7 @@ MEMBER_KEYWORDS = [
     "danh sách thành viên", "ai trong group", "có ai", "thành viên",
     "list member", "ai đang online", "bao nhiêu người", "ai đang ở đây",
 ]
+
+POLL_KEYWORDS = ["poll", "vote", "bầu", "bỏ phiếu"]
+
+REMIND_KEYWORDS = ["nhắc t", "remind", "nhắc tôi", "nhắc em"]
