@@ -409,7 +409,8 @@ async def on_message(message):
 
             "<:skirkangry:1471089056975687814> khi giận. "
 
-            "Chỉ dùng emoji khi thực sự phù hợp, không spam."
+            "Chỉ dùng emoji khi thực sự phù hợp, không spam. "
+            "Trả lời HOÀN TOÀN bằng tiếng Việt. Tuyệt đối không dùng ký tự tiếng Trung hay bất kỳ ngôn ngữ nào khác."
         )
 
         # =========================
