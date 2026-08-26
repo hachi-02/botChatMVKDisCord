@@ -139,6 +139,76 @@ async def on_message(message):
                 await message.channel.send(result, reference=message)
                 return
 
+            is_poll = any(kw in content_lower for kw in POLL_KEYWORDS)
+            if is_poll:
+                raw = message.content
+                raw = re.sub(r"(?i)^(chị\s*cá|chica)\s*", "", raw).strip()
+                raw = re.sub(r"(?i)^(poll|vote|bầu|bỏ\s*phiếu)\s*", "", raw).strip()
+                options = [o.strip() for o in re.split(r"\||;", raw) if o.strip()]
+
+                if len(options) < 2:
+                    await message.channel.send(
+                        "Em viết chưa đúng format rồi. "
+                        "Gõ: `poll pizza | phở | cơm` (phân tách bằng `|`) 🐟",
+                        reference=message,
+                    )
+                    return
+
+                if len(options) > 10:
+                    options = options[:10]
+
+                poll_text = f"**POLL: {options[0]}**\n"
+                for i, opt in enumerate(options):
+                    poll_text += f"{NUMBER_EMOJIS[i]} {opt}\n"
+                sender = message.author.display_name or message.author.name
+                poll_text += f"\nBỏ phiếu bằng cách react số tương ứng! ({sender} tạo)"
+
+                poll_msg = await message.channel.send(poll_text)
+                for i in range(len(options)):
+                    await poll_msg.add_reaction(NUMBER_EMOJIS[i])
+                return
+
+            is_remind = any(kw in content_lower for kw in REMIND_KEYWORDS)
+            if is_remind:
+                raw = message.content
+                raw = re.sub(r"(?i)^(chị\s*cá|chica)\s*", "", raw).strip()
+                raw = re.sub(r"(?i)^(nhắc\s*(t|tôi|em)|remind)\s*", "", raw).strip()
+
+                remind_time = parse_remind_time(raw)
+                if not remind_time:
+                    await message.channel.send(
+                        "Em viết chưa rõ thời gian rồi. "
+                        "Ví dụ: `nhắc t 30 phút học bài` hoặc `remind 7h đi ngủ` 🐟",
+                        reference=message,
+                    )
+                    return
+
+                task = re.sub(r"\d+\s*(phút|giờ|ngày|giây|min|h|hour|day|second|tieng|tiếng)[\s:]*\d*", "", raw, flags=re.IGNORECASE).strip()
+                if not task:
+                    task = "đến giờ rồi"
+
+                remind_queue.append({
+                    "user_id": message.author.id,
+                    "channel_id": message.channel.id,
+                    "time": remind_time,
+                    "task": task,
+                })
+
+                diff = remind_time - datetime.now()
+                hours, remainder = divmod(int(diff.total_seconds()), 3600)
+                minutes = remainder // 60
+                time_str = ""
+                if hours > 0:
+                    time_str += f"{hours} giờ "
+                if minutes > 0:
+                    time_str += f"{minutes} phút"
+
+                await message.channel.send(
+                    f"OK em, {time_str} nữa chị sẽ nhắc: **{task}** 🐟",
+                    reference=message,
+                )
+                return
+
             is_proactive = (
                 len(message.content) > MIN_MESSAGE_LENGTH
                 and random.random() < PROACTIVE_CHANCE
@@ -202,81 +272,6 @@ async def on_message(message):
             result += f"\n...và {online_count - 20} người nữa"
 
         await message.channel.send(result, reference=message)
-        return
-
-    # =========================
-    # POLL / VOTE
-    # =========================
-
-    is_poll = any(kw in content_lower for kw in POLL_KEYWORDS)
-    if is_poll:
-        raw = prompt
-        raw = re.sub(r"(?i)^(chị\s*cá|chica|poll|vote|bầu|bỏ\s*phiếu)\s*", "", raw).strip()
-        options = [o.strip() for o in re.split(r"\||;", raw) if o.strip()]
-
-        if len(options) < 2:
-            await message.channel.send(
-                "Em viết chưa đúng format rồi. "
-                "Gõ: `poll pizza | phở | cơm` (phân tách bằng `|`) 🐟",
-                reference=message,
-            )
-            return
-
-        if len(options) > 10:
-            options = options[:10]
-
-        poll_text = f"**POLL: {options[0]}**\n"
-        for i, opt in enumerate(options):
-            poll_text += f"{NUMBER_EMOJIS[i]} {opt}\n"
-        poll_text += f"\nBỏ phiếu bằng cách react số tương ứng! ({sender_name} tạo)"
-
-        poll_msg = await message.channel.send(poll_text)
-        for i in range(len(options)):
-            await poll_msg.add_reaction(NUMBER_EMOJIS[i])
-        return
-
-    # =========================
-    # REMIND
-    # =========================
-
-    is_remind = any(kw in content_lower for kw in REMIND_KEYWORDS)
-    if is_remind:
-        raw = prompt
-        raw = re.sub(r"(?i)^(chị\s*cá|chica|nhắc\s*(t|tôi|em)|remind)\s*", "", raw).strip()
-
-        remind_time = parse_remind_time(raw)
-        if not remind_time:
-            await message.channel.send(
-                "Em viết chưa rõ thời gian rồi. "
-                "Ví dụ: `nhắc t 30 phút học bài` hoặc `remind 7h đi ngủ` 🐟",
-                reference=message,
-            )
-            return
-
-        task = re.sub(r"\d+\s*(phút|giờ|ngày|giây|min|h|hour|day|second|tieng|tiếng)[\s:]*\d*", "", raw, flags=re.IGNORECASE).strip()
-        if not task:
-            task = "đến giờ rồi"
-
-        remind_queue.append({
-            "user_id": message.author.id,
-            "channel_id": message.channel.id,
-            "time": remind_time,
-            "task": task,
-        })
-
-        diff = remind_time - datetime.now()
-        hours, remainder = divmod(int(diff.total_seconds()), 3600)
-        minutes = remainder // 60
-        time_str = ""
-        if hours > 0:
-            time_str += f"{hours} giờ "
-        if minutes > 0:
-            time_str += f"{minutes} phút"
-
-        await message.channel.send(
-            f"OK em, {time_str} nữa chị sẽ nhắc: **{task}** 🐟",
-            reference=message,
-        )
         return
 
     # =========================
