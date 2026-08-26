@@ -226,8 +226,23 @@ async def on_message(message):
 
         answer = response.choices[0].message.content or ""
 
-        # Xóa thinking tags
+        # Xóa thinking tags và thinking leak
         answer = re.sub(r"<think>.*?</think>", "", answer, flags=re.DOTALL).strip()
+        answer = re.sub(r"<reasoning>.*?</reasoning>", "", answer, flags=re.DOTALL).strip()
+        # Xóa nếu bắt đầu bằng "Okay" hoặc "Let me" (thinking leak)
+        lines = answer.split("\n")
+        clean_lines = []
+        skip = True
+        for line in lines:
+            if skip and any(line.strip().startswith(x) for x in ["Okay,", "Let me", "The user", "Here's", "I need", "Thinking", "Alright"]):
+                continue
+            skip = False
+            clean_lines.append(line)
+        answer = "\n".join(clean_lines).strip()
+
+        # Nếu vẫn còn quá dài → cắt ngắn
+        if len(answer) > 4000:
+            answer = answer[:3997] + "..."
 
         print(f"AI: {answer}", flush=True)
 
