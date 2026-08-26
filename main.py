@@ -441,7 +441,7 @@ async def on_message(message):
 
         ai_message = response.choices[0].message
         finish_reason = response.choices[0].finish_reason
-
+        print("USAGE:", response.usage, flush=True)
         # =========================
         # DEBUG RAW
         # =========================
