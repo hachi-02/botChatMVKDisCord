@@ -190,31 +190,6 @@ async def on_message(message):
         return
 
     # =========================
-    # LỆNH NHẠC (Jokie Music)
-    # =========================
-
-    prompt_lower = prompt.lower()
-    music_keywords = [
-        "play ", "mở nhạc", "bật nhạc", "nghe nhạc",
-        "phát nhạc", "chơi nhạc", "cho nghe",
-    ]
-    if any(kw in prompt_lower for kw in music_keywords):
-        # Trích tên bài hát
-        song = prompt
-        for kw in music_keywords:
-            song = song.replace(kw, "").strip()
-        # Xóa tên bot
-        bot_names = ["chị cá", "chica", "chicá", "chị ca", "cá ơi", "ca ơi"]
-        for name in bot_names:
-            song = song.replace(name, "").strip()
-        # Bỏ dấu ? và .
-        song = song.rstrip("?.")
-        if song:
-            await message.channel.send(f"m!play {song}")
-            print(f"MUSIC: m!play {song}", flush=True)
-            return
-
-    # =========================
     # GỌI AI
     # =========================
 
