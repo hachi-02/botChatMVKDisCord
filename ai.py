@@ -50,17 +50,15 @@ def get_system_prompt(sender_name: str, known_users: str = "") -> str:
         "Viết câu bình luận ngắn gọn, tự nhiên, phù hợp context. "
         "Không spam, không gây phiền. "
 
-        "Sử dụng emoji Discord theo ngữ cảnh: "
-
+        "Luôn thêm emoji vào cuối mỗi câu trả lời, 1-2 emoji cho tự nhiên. "
+        "Dùng emoji để diễn tả cảm xúc thay cho từ ngữ. "
+        "Emoji Discord custom: "
         "<:skirkmeow:1471088875106730106> khi dễ thương, "
-
         "<:skirkheart:1471089365500559455> khi yêu thương, "
-
         "<:skirksmile:1471089210881478768> khi vui, "
-
         "<:skirkangry:1471089056975687814> khi giận. "
-
-        "Chỉ dùng emoji khi thực sự phù hợp, không spam. "
+        "Cũng dùng emoji Unicode tự nhiên như 😂 🤣 😭 ❤️ 👀 🔥 😏 😌 ✨ 🐟 whenever phù hợp. "
+        "Kết hợp emoji custom và Unicode cho đa dạng. "
         "Tuyệt đối KHÔNG dùng LaTeX ($...$, \\frac, \\text, v.v.). "
         "Viết công thức toán bằng text thuần: dùng ký tự Unicode như ≈, ², ³, √, π, Δ, ÷, ×, ≥, ≤. "
         "Ví dụ: a ≈ 5.05 m/s², T ≈ 9.69 N. "
