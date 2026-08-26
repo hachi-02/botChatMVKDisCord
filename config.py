@@ -50,3 +50,8 @@ PROACTIVE_KEYWORDS = [
     "học", "bài tập", "thi", "điểm",
     "tinder", "love", "crush", "tình yêu",
 ]
+
+MEMBER_KEYWORDS = [
+    "danh sách thành viên", "ai trong group", "có ai", "thành viên",
+    "list member", "ai đang online", "bao nhiêu người", "ai đang ở đây",
+]

@@ -4,13 +4,14 @@ import re
 
 import discord
 
-from config import ROLE_ID, KEYWORDS, CHUI_KEYWORDS, PROVOCATION_KEYWORDS, SEARCH_KEYWORDS, PROACTIVE_CHANCE, MIN_MESSAGE_LENGTH, PROACTIVE_KEYWORDS, MODEL_NAME
+from config import ROLE_ID, KEYWORDS, CHUI_KEYWORDS, PROVOCATION_KEYWORDS, SEARCH_KEYWORDS, PROACTIVE_CHANCE, MIN_MESSAGE_LENGTH, PROACTIVE_KEYWORDS, MODEL_NAME, MEMBER_KEYWORDS
 from ai import ai, get_system_prompt, clean_ai_response
 from memory import add_message, get_history
 from search import search_web
 from web_server import start_web_server
 
 intents = discord.Intents.default()
+intents.members = True
 intents.message_content = True
 
 bot = discord.Client(intents=intents)
@@ -21,6 +22,16 @@ async def on_ready():
     print(f"Bot đã online: {bot.user}", flush=True)
     await start_web_server()
     print("Chị Cá đã sẵn sàng 🐟", flush=True)
+
+
+@bot.event
+async def on_member_join(member):
+    channel = member.guild.system_channel
+    if channel:
+        await channel.send(
+            f"Chào em {member.mention} đến với server! 🐟 "
+            f"Gọi chị Cá nếu cần gì nhé."
+        )
 
 
 @bot.event
@@ -48,9 +59,28 @@ async def on_message(message):
 
     if not bot_mentioned and not role_mentioned:
         if not any(kw in content_lower for kw in KEYWORDS):
-            # =========================
-            # PROACTIVE INTERACTION
-            # =========================
+
+            is_member_list = any(kw in content_lower for kw in MEMBER_KEYWORDS)
+            if is_member_list and message.guild:
+                members = message.guild.members
+                online = [m for m in members if m.status != discord.Status.offline]
+                total = len(members)
+                online_count = len(online)
+
+                member_lines = []
+                for m in online[:20]:
+                    role = m.top_role.name if m.top_role.name != "@everyone" else ""
+                    status = "🟢" if m.status == discord.Status.online else "🟡"
+                    name = m.display_name
+                    member_lines.append(f"{status} {name}" + (f" ({role})" if role else ""))
+
+                result = f"**Thành viên đang online: {online_count}/{total}**\n"
+                result += "\n".join(member_lines)
+                if online_count > 20:
+                    result += f"\n...và {online_count - 20} người nữa"
+
+                await message.channel.send(result)
+                return
 
             is_proactive = (
                 len(message.content) > MIN_MESSAGE_LENGTH
@@ -94,6 +124,28 @@ async def on_message(message):
         prompt = f"[CHỬI] {prompt}"
     elif is_provoked:
         prompt = f"[CHỌC GHẸO] {prompt}"
+
+    is_member_list = any(kw in content_lower for kw in MEMBER_KEYWORDS)
+    if is_member_list and message.guild:
+        members = message.guild.members
+        online = [m for m in members if m.status != discord.Status.offline]
+        total = len(members)
+        online_count = len(online)
+
+        member_lines = []
+        for m in online[:20]:
+            role = m.top_role.name if m.top_role.name != "@everyone" else ""
+            status = "🟢" if m.status == discord.Status.online else "🟡"
+            name = m.display_name
+            member_lines.append(f"{status} {name}" + (f" ({role})" if role else ""))
+
+        result = f"**Thành viên đang online: {online_count}/{total}**\n"
+        result += "\n".join(member_lines)
+        if online_count > 20:
+            result += f"\n...và {online_count - 20} người nữa"
+
+        await message.channel.send(result)
+        return
 
     # =========================
     # TIM KIEM WEB
