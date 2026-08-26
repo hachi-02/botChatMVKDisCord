@@ -418,7 +418,7 @@ async def on_message(message):
         # GỌI GROQ
         # =========================
         #
-        # reasoning_effort="none" -> tắt hẳn chế độ "nghĩ" của Qwen3.6
+        # reasoning_effort="default" -> bật chế độ thinking của Qwen3.8
         #                            (tham số CHÍNH THỨC được SDK hỗ trợ,
         #                            không cần reasoning_format nữa)
         # max_tokens tăng lên      -> tránh bị cắt cụt giữa chừng
@@ -426,7 +426,7 @@ async def on_message(message):
         response = await asyncio.to_thread(
             ai.chat.completions.create,
             model=MODEL_NAME,
-            reasoning_effort="none",
+            reasoning_effort="default",
             messages=[
                 {
                     "role": "system",
