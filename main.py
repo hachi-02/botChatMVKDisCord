@@ -423,7 +423,7 @@ async def on_message(message):
             "Thỉnh thoảng châm biếm nhẹ, không cay người. "
 
             "Không nịnh bợ. "
-            "Không cần nói quá dài. "
+            "Câu trả lời phải NGẮN GỌN, tối đa 2-3 câu. Không dài dòng. "
 
             f"Em đang nói chuyện với {sender_name}. "
 
@@ -534,6 +534,13 @@ async def on_message(message):
             repr(answer),
             flush=True
         )
+
+        # =========================
+        # XÓA TAG CHỬI / CHỌC GHẸO
+        # =========================
+
+        answer = re.sub(r"\[CHỬI\]\s*", "", answer)
+        answer = re.sub(r"\[CHỌC GHẸO\]\s*", "", answer)
 
         # =========================
         # GIỚI HẠN DISCORD 2000 KÝ TỰ
