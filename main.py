@@ -250,28 +250,49 @@ async def on_message(message):
     # KEYWORD
     # =========================
 
+    content_lower = message.content.lower()
+
+    keywords = [
+        "chị cá",
+        "chica",
+        "chicá",
+        "chị ca",
+        "cá ơi",
+        "ca ơi",
+        "ê chị cá",
+        "ê chica",
+        "chị cá ơi",
+        "chica ơi",
+        "chửi",
+    ]
+
     if not bot_mentioned and not role_mentioned:
-
-        content_lower = message.content.lower()
-
-        keywords = [
-            "chị cá",
-            "chica",
-            "chicá",
-            "chị ca",
-            "cá ơi",
-            "ca ơi",
-            "ê chị cá",
-            "ê chica",
-            "chị cá ơi",
-            "chica ơi",
-        ]
 
         if not any(
             kw in content_lower
             for kw in keywords
         ):
             return
+
+    # =========================
+    # DETECT CHỬI / CHỌC GHẸO
+    # =========================
+
+    is_chui = any(
+        kw in content_lower
+        for kw in ["chửi"]
+    )
+
+    provocation_keywords = [
+        "ngu", "đần", "câm", "đồ ngu", "mày ngu",
+        "bạn ngu", "dở", "kém", "tệ", "loser",
+        "đồ khùng", "đồ điên", "bẩn", "xấu",
+    ]
+
+    is_provoked = any(
+        kw in content_lower
+        for kw in provocation_keywords
+    )
 
     # =========================
     # LẤY NỘI DUNG
@@ -320,6 +341,15 @@ async def on_message(message):
         message.author.display_name
         or message.author.name
     )
+
+    # =========================
+    # THÊM TAG CHỬI
+    # =========================
+
+    if is_chui:
+        prompt = f"[CHỬI] {prompt}"
+    elif is_provoked:
+        prompt = f"[CHỌC GHẸO] {prompt}"
 
     # =========================
     # CHỈ MENTION KHÔNG TEXT
@@ -398,6 +428,12 @@ async def on_message(message):
             f"Em đang nói chuyện với {sender_name}. "
 
             "Nhớ context cuộc trò chuyện trước đó. "
+
+            "CHỬI TỤC: "
+            "Nếu tin nhắn có tag [CHỬI], được phép chửi tục. "
+            "Nếu tin nhắn có tag [CHỌC GHẸO], được phép chửi lại vì bị chọc. "
+            "Mức độ chửi tùy tình huống: nhẹ nhàng nếu vui đùa, nặng hơn nếu bị xúc phạm. "
+            "Vẫn giữ personality lạnh lùng, chửi xong có thể quay lại bình thường. "
 
             "Sử dụng emoji Discord theo ngữ cảnh: "
 
