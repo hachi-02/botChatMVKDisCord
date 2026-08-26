@@ -88,10 +88,10 @@ async def start_web_server():
 # XỬ LÝ THINKING (lớp phòng thủ dự phòng)
 # =========================
 #
-# Với reasoning_format="hidden", Groq sẽ tự strip phần <think> ở phía
-# server và answer trả về chỉ còn câu trả lời cuối. Hàm này vẫn được
-# giữ lại làm lớp bảo vệ thứ 2, phòng trường hợp Groq đổi hành vi hoặc
-# model lách quy tắc, kèm regex được mở rộng để bắt nhiều biến thể tag.
+# Với reasoning_effort="none", Qwen3.6 sẽ không sinh phần <think> nữa.
+# Hàm này vẫn được giữ lại làm lớp bảo vệ thứ 2, phòng trường hợp model
+# lách quy tắc hoặc trả về định dạng khác, kèm regex mở rộng để bắt
+# nhiều biến thể tag hơn.
 
 def clean_ai_response(answer: str) -> str:
     """
@@ -416,19 +416,16 @@ async def on_message(message):
         # GỌI GROQ
         # =========================
         #
-        # reasoning_effort="none"  -> tắt hẳn chế độ "nghĩ" của Qwen3.6
-        #                             (thay cho "/no_think" không có tác dụng)
-        # reasoning_format="hidden" -> nếu model vẫn sinh reasoning vì lý do
-        #                             nào đó, Groq tự lọc bỏ ở server, answer
-        #                             trả về chỉ còn nội dung cuối cùng
-        # max_tokens tăng lên       -> tránh bị cắt cụt giữa chừng
+        # reasoning_effort="none" -> tắt hẳn chế độ "nghĩ" của Qwen3.6
+        #                            (tham số CHÍNH THỨC được SDK hỗ trợ,
+        #                            không cần reasoning_format nữa)
+        # max_tokens tăng lên      -> tránh bị cắt cụt giữa chừng
 
         response = await asyncio.to_thread(
             ai.chat.completions.create,
             model=MODEL_NAME,
             max_tokens=1500,
             reasoning_effort="none",
-            reasoning_format="hidden",
             messages=[
                 {
                     "role": "system",
