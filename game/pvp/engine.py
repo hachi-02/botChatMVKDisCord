@@ -1,6 +1,6 @@
 import random
 
-from config import PVP_ENERGY_MAX, PVP_MAX_ROUND
+from config import PVP_ENERGY_MAX, PVP_MAX_ROUND, PVP_SP_START, PVP_SP_MAX
 
 from .cards import ELEMENT_ADVANTAGE, ELEM_STRONG, ELEM_WEAK
 
@@ -43,13 +43,6 @@ def _elem_mult(att_elem: str, def_elem: str) -> float:
     return 1.0
 
 
-def _front(team):
-    for f in team:
-        if f.alive:
-            return f
-    return None
-
-
 def _compute_damage(attacker: Fighter, defender: Fighter, mult: float):
     base = (
         attacker.atk
@@ -73,14 +66,13 @@ def _compute_damage(attacker: Fighter, defender: Fighter, mult: float):
     return dmg, crit
 
 
-def _apply_effect(caster: Fighter, team: list, enemy: list, eff: dict, log: list):
+def _apply_effect(caster: Fighter, team: list, enemy: list, eff: dict, log: list, target=None):
     t = eff["type"]
     p = eff.get("power", 0)
     p2 = eff.get("power2", 0)
     tag = f"🔮 **{caster.name}** → **{eff['name']}**"
     if t == "ST_DMG":
-        target = _front(enemy)
-        if target:
+        if target and target.alive:
             dmg, crit = _compute_damage(caster, target, p)
             log.append(f"{tag}: {target.name} mất {dmg} HP{' 💥' if crit else ''}")
     elif t == "AOE_DMG":
@@ -93,10 +85,10 @@ def _apply_effect(caster: Fighter, team: list, enemy: list, eff: dict, log: list
             ally.shield = max(ally.shield, p)
         log.append(f"{tag}: toàn đội giáp giảm {int(p*100)}% 🛡️")
     elif t == "HEAL":
-        target = min((f for f in team if f.alive), key=lambda f: f.hp / f.max_hp)
-        before = target.hp
-        target.hp = min(target.max_hp, target.hp + p)
-        log.append(f"{tag}: hồi {target.hp - before} HP cho {target.name} 💚")
+        low = min((f for f in team if f.alive), key=lambda f: f.hp / f.max_hp)
+        before = low.hp
+        low.hp = min(low.max_hp, low.hp + p)
+        log.append(f"{tag}: hồi {low.hp - before} HP cho {low.name} 💚")
     elif t == "BUFF_ATK":
         for ally in team:
             ally.atk_buff += p
@@ -110,8 +102,7 @@ def _apply_effect(caster: Fighter, team: list, enemy: list, eff: dict, log: list
             e.def_debuff += p
         log.append(f"{tag}: địch nhận +{int(p*100)}% sát thương 🔻")
     elif t == "STUN":
-        target = _front(enemy)
-        if target:
+        if target and target.alive:
             target.stunned = True
             log.append(f"{tag}: {target.name} bị choáng ⭐")
     elif t == "SHIELD_HEAL":
@@ -126,8 +117,7 @@ def _apply_effect(caster: Fighter, team: list, enemy: list, eff: dict, log: list
         before = low.hp
         low.hp = min(low.max_hp, low.hp + p)
         log.append(f"{tag}: hồi {low.hp - before} HP cho {low.name} 💚")
-        target = _front(enemy)
-        if target:
+        if target and target.alive:
             dmg, crit = _compute_damage(caster, target, p2)
             log.append(f"{tag}: {target.name} -{dmg} HP{' 💥' if crit else ''}")
     elif t == "HEAL_BUFF":
@@ -139,26 +129,20 @@ def _apply_effect(caster: Fighter, team: list, enemy: list, eff: dict, log: list
         log.append(f"{tag}: hồi {low.hp - before} HP + toàn đội +{int(p2*100)}% ATK 💚⬆️")
 
 
-def _basic_attack(attacker: Fighter, enemy_team: list, log: list):
-    defender = _front(enemy_team)
-    if defender is None:
+def _basic_attack(attacker: Fighter, target: Fighter, log: list):
+    if target is None or not target.alive:
+        log.append(f"➡️ {attacker.name} đánh thường nhưng không có mục tiêu")
         return
-    dmg, crit = _compute_damage(attacker, defender, 1.0)
+    dmg, crit = _compute_damage(attacker, target, 1.0)
     log.append(
-        f"➡️ {attacker.name} đánh thường {defender.name}: -{dmg} HP"
+        f"➡️ {attacker.name} đánh thường {target.name}: -{dmg} HP"
         f"{' 💥 CRIT!' if crit else ''}"
     )
     attacker.gain_energy(20)
 
 
-def use_skill(attacker: Fighter, team: list, enemy: list, log: list):
-    _apply_effect(attacker, team, enemy, attacker.skill, log)
-    attacker.gain_energy(30)
-
-
-def use_ultimate(attacker: Fighter, team: list, enemy: list, log: list):
-    _apply_effect(attacker, team, enemy, attacker.ultimate, log)
-    attacker.energy = 0
+def _needs_target(eff: dict) -> bool:
+    return eff["type"] in ("ST_DMG", "STUN", "HEAL_ST_DMG")
 
 
 # ===================== BATTLE SESSION =====================
@@ -170,58 +154,78 @@ class BattleSession:
         self.b_user = b_user
         self.channel = channel
         self.bot = bot
-        self.round = 0
+        self.active_team = "A"
+        self.acted = set()
+        self.sp_a = PVP_SP_START
+        self.sp_b = PVP_SP_START
+        self.round = 1
         self.log = []
-        self.order = []
-        self.idx = 0
         self.message = None
         self.done = False
+        self._start_rotation(self.team_a)
+
+    def _active_team(self):
+        return self.team_a if self.active_team == "A" else self.team_b
 
     def _enemy_of(self, fighter: Fighter):
         return self.team_b if fighter in self.team_a else self.team_a
 
+    def _owner_active(self):
+        return self.a_user if self.active_team == "A" else self.b_user
+
+    def _sp_of(self, fighter: Fighter) -> int:
+        return self.sp_a if fighter in self.team_a else self.sp_b
+
+    def _set_sp(self, fighter: Fighter, val: int):
+        if fighter in self.team_a:
+            self.sp_a = val
+        else:
+            self.sp_b = val
+
+    def available_chars(self, team):
+        return [f for f in team if f.alive and f.key not in self.acted and not f.stunned]
+
+    def _start_rotation(self, team):
+        if any(f.alive and f.role == "SUP" for f in team):
+            cands = [f for f in team if f.alive]
+            if cands:
+                low = min(cands, key=lambda f: f.hp / f.max_hp)
+                low.hp = min(low.max_hp, low.hp + 5)
+
+    def end_rotation(self):
+        for f in self._active_team():
+            f.stunned = False
+        self.active_team = "B" if self.active_team == "A" else "A"
+        self.acted = set()
+        self.round += 1
+        self._start_rotation(self._active_team())
+
+    def apply_action(self, actor: Fighter, action: str, target: Fighter) -> bool:
+        team = self._team_of(actor)
+        enemy = self._enemy_of(actor)
+        sp = self._sp_of(actor)
+        if action == "normal":
+            _basic_attack(actor, target, self.log)
+            sp = min(PVP_SP_MAX, sp + 1)
+        elif action == "skill":
+            if sp <= 0:
+                return False
+            _apply_effect(actor, team, enemy, actor.skill, self.log, target)
+            actor.gain_energy(30)
+            sp -= 1
+        elif action == "ultimate":
+            if actor.energy < PVP_ENERGY_MAX:
+                return False
+            _apply_effect(actor, team, enemy, actor.ultimate, self.log, target)
+            actor.energy = 0
+        else:
+            return False
+        self._set_sp(actor, sp)
+        self.acted.add(actor.key)
+        return True
+
     def _team_of(self, fighter: Fighter):
         return self.team_a if fighter in self.team_a else self.team_b
-
-    def _owner(self, fighter: Fighter):
-        return self.a_user if fighter in self.team_a else self.b_user
-
-    def build_order(self):
-        self.round += 1
-        alive = [f for f in self.team_a + self.team_b if f.alive]
-        alive.sort(key=lambda f: f.spd, reverse=True)
-        self.order = alive
-        self.idx = 0
-        for team in (self.team_a, self.team_b):
-            if any(f.alive and f.role == "SUP" for f in team):
-                cands = [f for f in team if f.alive]
-                if cands:
-                    low = min(cands, key=lambda f: f.hp / f.max_hp)
-                    low.hp = min(low.max_hp, low.hp + 5)
-
-    def current_actor(self):
-        while self.idx < len(self.order) and not self.order[self.idx].alive:
-            self.idx += 1
-        if self.idx >= len(self.order):
-            if self.round >= PVP_MAX_ROUND:
-                return None
-            self.build_order()
-        while self.idx < len(self.order) and not self.order[self.idx].alive:
-            self.idx += 1
-        if self.idx >= len(self.order):
-            return None
-        return self.order[self.idx]
-
-    def apply_action(self, fighter: Fighter, action: str):
-        team = self._team_of(fighter)
-        enemy = self._enemy_of(fighter)
-        if action == "normal":
-            _basic_attack(fighter, enemy, self.log)
-        elif action == "skill":
-            use_skill(fighter, team, enemy, self.log)
-        elif action == "ultimate":
-            use_ultimate(fighter, team, enemy, self.log)
-        self.idx += 1
 
     def check_winner(self):
         a_alive = any(f.alive for f in self.team_a)

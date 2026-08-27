@@ -7,6 +7,7 @@ from config import (
     PVP_ACCEPT_TIMEOUT,
     PVP_TURN_TIMEOUT,
     PVP_ENERGY_MAX,
+    PVP_SP_MAX,
     PVP_START_RATING,
     PVP_BATTLE_ANIM_GIF,
 )
@@ -164,43 +165,107 @@ async def _begin_selection(interaction, session: PVPSession, side: str):
     )
 
 
-# ====================== BATTLE (interactive) ======================
-class ActionView(discord.ui.View):
-    def __init__(self, battle: BattleSession, fighter):
+# ====================== BATTLE (team rotation + SP) ======================
+class ControlPanelView(discord.ui.View):
+    def __init__(self, battle: BattleSession):
         super().__init__(timeout=PVP_TURN_TIMEOUT)
         self.battle = battle
-        self.fighter = fighter
-        self.children[2].disabled = fighter.energy < PVP_ENERGY_MAX
+        team = battle._active_team()
+        chars = battle.available_chars(team)
+        enemies = [f for f in battle._enemy_of(team[0]) if f.alive] if team else []
+        self.char_select = discord.ui.Select(
+            placeholder="① Chọn thẻ hành động",
+            min_values=1, max_values=1,
+            options=[discord.SelectOption(
+                label=f["name"], value=f["key"],
+                description=f"{ROLE_LABEL[f['role']]} • {f['element']}",
+                emoji=ELEMENT_EMOJI.get(f["element"], "❔"),
+            ) for f in chars],
+        )
+        self.char_select.callback = self._noop
+        self.target_select = discord.ui.Select(
+            placeholder="② Chọn mục tiêu địch",
+            min_values=1, max_values=1,
+            options=[discord.SelectOption(
+                label=e["name"], value=e["key"],
+                description=f"{ROLE_LABEL[e['role']]} • {e['element']}",
+                emoji=ELEMENT_EMOJI.get(e["element"], "❔"),
+            ) for e in enemies],
+        )
+        self.target_select.callback = self._noop
+        self.add_item(self.char_select)
+        self.add_item(self.target_select)
+
+        sp = battle.sp_a if battle.active_team == "A" else battle.sp_b
+        self.btn_normal = discord.ui.Button(label="⚔️ Đánh thường", style=discord.ButtonStyle.secondary)
+        self.btn_skill = discord.ui.Button(label="🔥 Skill", style=discord.ButtonStyle.primary, disabled=(sp <= 0))
+        self.btn_ult = discord.ui.Button(label="✨ Ultimate", style=discord.ButtonStyle.danger)
+        self.btn_normal.callback = lambda i: self._act(i, "normal")
+        self.btn_skill.callback = lambda i: self._act(i, "skill")
+        self.btn_ult.callback = lambda i: self._act(i, "ultimate")
+        self.add_item(self.btn_normal)
+        self.add_item(self.btn_skill)
+        self.add_item(self.btn_ult)
+
+    async def _noop(self, interaction: discord.Interaction):
+        await interaction.response.defer()
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        return interaction.user.id == self.battle._owner(self.fighter).id
-
-    @discord.ui.button(label="⚔️ Đánh thường", style=discord.ButtonStyle.secondary)
-    async def normal(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self._act(interaction, "normal")
-
-    @discord.ui.button(label="🔥 Skill", style=discord.ButtonStyle.primary)
-    async def skill(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self._act(interaction, "skill")
-
-    @discord.ui.button(label="✨ Ultimate", style=discord.ButtonStyle.danger)
-    async def ult(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self._act(interaction, "ultimate")
+        return interaction.user.id == self.battle._owner_active().id
 
     async def _act(self, interaction: discord.Interaction, action: str):
-        self.battle.apply_action(self.fighter, action)
-        for item in self.children:
-            item.disabled = True
+        battle = self.battle
+        char_key = self.char_select.values[0] if self.char_select.values else None
+        if char_key is None:
+            await interaction.response.send_message("Hãy chọn ① thẻ hành động!", ephemeral=True)
+            return
+        actor = next((f for f in battle._active_team() if f.key == char_key), None)
+        if actor is None or not actor.alive or actor.key in battle.acted or actor.stunned:
+            await interaction.response.send_message("Thẻ không hợp lệ!", ephemeral=True)
+            return
+
+        eff = actor.skill if action == "skill" else (actor.ultimate if action == "ultimate" else None)
+        needs_target = action == "normal" or (eff is not None and eff["type"] in ("ST_DMG", "STUN", "HEAL_ST_DMG"))
+        target = None
+        if needs_target:
+            tkey = self.target_select.values[0] if self.target_select.values else None
+            if tkey is None:
+                await interaction.response.send_message("Hãy chọn ② mục tiêu địch!", ephemeral=True)
+                return
+            target = next((e for e in battle._enemy_of(actor) if e.key == tkey and e.alive), None)
+            if target is None:
+                await interaction.response.send_message("Mục tiêu không hợp lệ!", ephemeral=True)
+                return
+
+        sp = battle._sp_of(actor)
+        if action == "skill" and sp <= 0:
+            await interaction.response.send_message("Hết Skill Point! 🔋", ephemeral=True)
+            return
+        if action == "ultimate" and actor.energy < PVP_ENERGY_MAX:
+            await interaction.response.send_message("Chưa đủ energy Ultimate! ⚡", ephemeral=True)
+            return
+
+        battle.apply_action(actor, action, target)
+        for it in self.children:
+            it.disabled = True
         await interaction.response.edit_message(view=self)
-        await _after_action(self.battle)
+        self.stop()
+        await _after_action(battle)
 
     async def on_timeout(self):
-        if self.battle.done or not self.fighter.alive:
+        if self.battle.done:
+            return
+        team = self.battle._active_team()
+        chars = self.battle.available_chars(team)
+        if not chars:
             await _after_action(self.battle)
             return
-        self.battle.apply_action(self.fighter, "normal")
-        for item in self.children:
-            item.disabled = True
+        actor = chars[0]
+        enemies = [e for e in self.battle._enemy_of(actor) if e.alive]
+        target = enemies[0] if enemies else None
+        self.battle.apply_action(actor, "normal", target)
+        for it in self.children:
+            it.disabled = True
         await _after_action(self.battle)
 
 
@@ -227,24 +292,23 @@ async def _resolve(session: PVPSession, interaction: discord.Interaction):
     battle.message = await interaction.followup.send(
         embed=discord.Embed(title="⚔️ Đang vào trận...", color=PVP_COLOR)
     )
-    battle.build_order()
-    await _post_turn(battle)
+    await _post_panel(battle)
 
 
-async def _post_turn(battle: BattleSession):
-    w = battle.check_winner()
-    if w is not False:
-        await _finish_battle(battle, w)
-        return
-    actor = battle.current_actor()
-    if actor is None:
-        await _finish_battle(battle, battle.check_winner())
-        return
-    embed = _battle_embed(battle, actor)
+async def _post_panel(battle: BattleSession):
+    team = battle._active_team()
+    if not battle.available_chars(team):
+        for f in team:
+            f.stunned = False
+        if not battle.available_chars(team):
+            w = battle.check_winner()
+            await _finish_battle(battle, w if w is not False else None)
+            return
+    embed = _battle_embed(battle)
     try:
-        await battle.message.edit(embed=embed, view=ActionView(battle, actor))
+        await battle.message.edit(embed=embed, view=ControlPanelView(battle))
     except Exception as e:
-        print("LỖI POST_TURN:", e, flush=True)
+        print("LỖI POST_PANEL:", e, flush=True)
 
 
 async def _after_action(battle: BattleSession):
@@ -252,7 +316,10 @@ async def _after_action(battle: BattleSession):
     if w is not False:
         await _finish_battle(battle, w)
         return
-    await _post_turn(battle)
+    active = battle._active_team()
+    if not battle.available_chars(active):
+        battle.end_rotation()
+    await _post_panel(battle)
 
 
 async def _finish_battle(battle: BattleSession, winner):
@@ -305,29 +372,41 @@ def _team_preview_embed(user, cards):
     return e
 
 
-def _battle_embed(battle: BattleSession, actor):
-    e = discord.Embed(title=f"⚔️ PvP — Round {battle.round}", color=PVP_COLOR)
+def _team_battle_lines(team, battle):
+    lines = []
+    for f in team:
+        mark = "💀" if not f.alive else ("✅" if f.key in battle.acted else ("⭐" if f.stunned else "❤️"))
+        if not f.alive:
+            lines.append(f"💀 {f.name}")
+            continue
+        lines.append(
+            f"{mark} {ELEMENT_EMOJI.get(f.element,'❔')} **{f.name}** [{ROLE_LABEL[f.role]}]\n"
+            f"{_bar(max(0,f.hp), f.max_hp)} {max(0,f.hp)}/{f.max_hp}\n"
+            f"⚡{f.energy}/{PVP_ENERGY_MAX}{' 🛡️' if f.shield > 0 else ''}"
+        )
+    return "\n".join(lines)
+
+
+def _battle_embed(battle: BattleSession):
+    e = discord.Embed(title=f"⚔️ PvP — Lượt {battle._owner_active().display_name}", color=PVP_COLOR)
     e.set_author(name="Chị Cá 🐟 PvP")
+    sp = battle.sp_a if battle.active_team == "A" else battle.sp_b
     e.add_field(
         name=f"🔵 {battle.a_user.display_name}",
-        value=_team_battle_lines(battle.team_a),
+        value=_team_battle_lines(battle.team_a, battle),
         inline=True,
     )
     e.add_field(
         name=f"🔴 {battle.b_user.display_name}",
-        value=_team_battle_lines(battle.team_b),
+        value=_team_battle_lines(battle.team_b, battle),
         inline=True,
     )
-    if actor and actor.alive:
-        owner = battle._owner(actor)
-        e.add_field(
-            name="🎯 Lượt của",
-            value=f"{owner.mention}: **{actor.name}** {ROLE_LABEL[actor.role]} "
-                  f"⚡{actor.energy}/{PVP_ENERGY_MAX}",
-            inline=False,
-        )
-    else:
-        e.add_field(name="🎯 Lượt", value="—", inline=False)
+    e.add_field(
+        name="🎯 Đến lượt",
+        value=f"{battle._owner_active().mention} — 🔋 SP {sp}/{PVP_SP_MAX}\n"
+              f"① Chọn thẻ · ② Chọn mục tiêu · bấm hành động",
+        inline=False,
+    )
     log = battle.log[-10:]
     e.add_field(
         name="📜 Diễn biến",
@@ -335,20 +414,6 @@ def _battle_embed(battle: BattleSession, actor):
         inline=False,
     )
     return e
-
-
-def _team_battle_lines(team):
-    lines = []
-    for f in team:
-        if not f.alive:
-            lines.append(f"💀 {f.name}")
-            continue
-        lines.append(
-            f"{ELEMENT_EMOJI.get(f.element,'❔')} **{f.name}** [{ROLE_LABEL[f.role]}]\n"
-            f"{_bar(max(0,f.hp), f.max_hp)} {max(0,f.hp)}/{f.max_hp}\n"
-            f"⚡{f.energy}/{PVP_ENERGY_MAX}{' 🛡️' if f.shield > 0 else ''}"
-        )
-    return "\n".join(lines)
 
 
 def _result_embed(battle, result, ra, rb, na, nb, win_user, lose_user, draw):
@@ -451,7 +516,7 @@ async def start_pvp_challenge(message, bot):
     )
     e.set_author(name="Chị Cá 🐟 PvP")
     e.set_thumbnail(url=PVP_BATTLE_ANIM_GIF)
-    e.set_footer(text="Mỗi lượt: Đánh thường / Skill / Ultimate · tới lượt ai người đó bấm")
+    e.set_footer(text="Mỗi lượt: chọn thẻ + mục tiêu + hành động (Đánh thường/Skill/Ultimate) · SP chung team")
     await message.channel.send(embed=e, view=ChallengeView(session), reference=message)
 
 
