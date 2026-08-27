@@ -21,6 +21,7 @@ from config import (
     REMIND_KEYWORDS,
     EVENT_KEYWORDS,
     EVENT_HELP_KEYWORDS,
+    INVITE_KEYWORDS,
     HELP_KEYWORDS,
     EVENT_REMIND_MINUTES,
     EVENT_DEFAULT_DURATION_MINUTES,
@@ -63,6 +64,7 @@ HELP_TEXT = (
     "📊 Vote: `chị cá` + `vote pizza | phở | cơm`\n"
     "⏰ Nhắc: `chị cá` + `nhắc em 7h học bài`\n"
     "📅 Tạo sự kiện: `chị cá tạo sự kiện` + `Tên | thời gian | mô tả | địa điểm`\n"
+    "🔗 Lời mời: `chị cá` + `tạo link mời`\n"
     "Gõ `chị cá menu` để xem lại nhé!"
 )
 
@@ -388,6 +390,28 @@ async def on_message(message):
         handled = await handle_event_creation(message)
         if handled:
             return
+
+    is_invite = addressed and any(kw in content_lower for kw in INVITE_KEYWORDS)
+    if is_invite:
+        try:
+            invite = await message.channel.create_invite(
+                max_age=604800,
+                max_uses=0,
+                unique=True,
+                reason="Tạo lời mời bởi Chị Cá",
+            )
+            await message.channel.send(
+                f"🔗 Lời mời vào server: {invite.url}\n(Link hiệu lực 7 ngày)",
+                reference=message,
+            )
+        except Exception as e:
+            print(f"LỖI CREATE INVITE: {type(e).__name__}: {e}", flush=True)
+            await message.channel.send(
+                "Chị không tạo được lời mời 😭 (bot thiếu quyền **Create Instant Invite** "
+                "hoặc kênh không cho phép tạo invite).",
+                reference=message,
+            )
+        return
 
     if addressed:
         is_member_list = any(kw in content_lower for kw in MEMBER_KEYWORDS)
