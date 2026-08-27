@@ -1,9 +1,11 @@
 import asyncio
 import io
+import os
 import random
 
 import aiohttp
 import discord
+from PIL import Image, ImageDraw, ImageFont
 
 from db import (
     get_points,
@@ -38,6 +40,69 @@ async def _fetch_image(session, url):
     async with session.get(url) as resp:
         resp.raise_for_status()
         return await resp.read()
+
+
+def _font_path():
+    here = os.path.dirname(__file__)
+    candidates = [
+        os.path.join(here, "fonts", "NotoSans-Regular.ttf"),
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf",
+    ]
+    for p in candidates:
+        if os.path.exists(p):
+            return p
+    return None
+
+
+def _stars(rarity):
+    return "★★★★★" if rarity in ("5L", "5S") else "★★★★"
+
+
+async def _build_montage(results, is_new_list):
+    font_path = _font_path()
+    name_font = ImageFont.truetype(font_path, 26) if font_path else ImageFont.load_default()
+    star_font = ImageFont.truetype(font_path, 22) if font_path else ImageFont.load_default()
+
+    cell_w = 230
+    img_h = 320
+    gap = 12
+    pad = 14
+    bg = (43, 45, 49, 255)
+    n = len(results)
+    total_w = pad * 2 + n * cell_w + (n - 1) * gap
+    total_h = pad * 2 + img_h + 78
+
+    canvas = Image.new("RGBA", (total_w, total_h), bg)
+    draw = ImageDraw.Draw(canvas)
+
+    async with aiohttp.ClientSession() as s:
+        for i, (r, is_new) in enumerate(zip(results, is_new_list)):
+            x0 = pad + i * (cell_w + gap)
+            y0 = pad
+            try:
+                data = await _fetch_image(s, _thumb(r["url"], 400))
+                im = Image.open(io.BytesIO(data)).convert("RGBA")
+            except Exception as e:
+                print(f"LỖI FETCH IMG: {type(e).__name__}: {e}", flush=True)
+                im = Image.new("RGBA", (cell_w, img_h), (60, 63, 68, 255))
+            im.thumbnail((cell_w, img_h), Image.Resampling.LANCZOS)
+            ix = x0 + (cell_w - im.width) // 2
+            iy = y0 + (img_h - im.height) // 2
+            canvas.alpha_composite(im, (ix, iy))
+
+            rarity_color = (255, 215, 0) if r["rarity"] in ("5L", "5S") else (155, 89, 182)
+            name_y = y0 + img_h + 10
+            draw.text((x0 + cell_w // 2, name_y), r["name"], font=name_font, fill=rarity_color, anchor="mm")
+            star_y = name_y + 32
+            draw.text((x0 + cell_w // 2, star_y), _stars(r["rarity"]), font=star_font, fill=(255, 215, 0), anchor="mm")
+            if is_new:
+                draw.text((x0 + cell_w // 2, star_y + 30), "MỚI!", font=star_font, fill=(46, 204, 113), anchor="mm")
+
+    buf = io.BytesIO()
+    canvas.convert("RGB").save(buf, format="PNG")
+    buf.seek(0)
+    return discord.File(buf, filename="gacha_result.png")
 
 
 def roll_one(state):
@@ -87,23 +152,12 @@ async def handle_gacha(channel, author, bot, n):
 
     owned = {c["char_key"]: c["dup_count"] for c in await get_collection(uid)}
     local_seen = {}
-    lines = []
-    files = []
-    async with aiohttp.ClientSession() as s:
-        for i, r in enumerate(results, 1):
-            base = owned.get(r["key"], 0)
-            seen = local_seen.get(r["key"], 0)
-            total = base + seen
-            is_new = total == 0
-            label = "MỚI!" if is_new else f"TRÙNG x{total + 1}"
-            lines.append(f"{i}. **{r['name']}** ({RARITY_LABEL[r['rarity']]}) — {label}")
-            try:
-                data = await _fetch_image(s, _thumb(r["url"], 400))
-                ext = "webp" if "webp" in r["url"] else "gif"
-                files.append(discord.File(io.BytesIO(data), filename=f"{r['key']}.{ext}"))
-            except Exception as e:
-                print(f"LỖI FETCH IMG: {type(e).__name__}: {e}", flush=True)
-            local_seen[r["key"]] = seen + 1
+    is_new_list = []
+    for r in results:
+        base = owned.get(r["key"], 0)
+        seen = local_seen.get(r["key"], 0)
+        is_new_list.append((base + seen) == 0)
+        local_seen[r["key"]] = seen + 1
 
     roll = discord.Embed(title="🎰 Đang quay...", color=EMBED_COLOR)
     roll.set_image(url=GACHA_ROLL_GIF)
@@ -114,11 +168,13 @@ async def handle_gacha(channel, author, bot, n):
     except Exception:
         pass
 
-    content = f"🎴 Kết quả quay **{n} lần** của {author.mention}:\n" + "\n".join(lines)
-    if files:
-        await channel.send(content=content, files=files)
-    else:
-        await channel.send(content=content)
+    try:
+        file = await _build_montage(results, is_new_list)
+        await channel.send(content=f"🎴 Kết quả quay **{n} lần** của {author.mention}:", file=file)
+    except Exception as e:
+        print(f"LỖI MONTAGE: {type(e).__name__}: {e}", flush=True)
+        names = " | ".join(r["name"] for r in results)
+        await channel.send(content=f"🎴 Kết quả quay **{n} lần** của {author.mention}: {names}")
     for r in results:
         await add_card(uid, r["key"], r["rarity"])
 
