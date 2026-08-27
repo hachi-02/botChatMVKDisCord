@@ -92,7 +92,7 @@ def _menu_embed(bot):
         ("💬 Nói chuyện", "Gọi `chị cá` hoặc tag chị"),
         ("🔍 Tìm web", "`chị cá` + \"tìm\", \"là ai\", \"khi nào\"..."),
         ("👥 Thành viên online", "`chị cá` + \"ai đang online\""),
-        ("📊 Vote", "`chị cá` + `vote pizza | phở | cơm`"),
+        ("📊 Vote", "`chị cá` + `vote Câu hỏi? | chọn 1 | chọn 2`"),
         ("⏰ Nhắc", "`chị cá` + `nhắc em 7h học bài`"),
         ("📅 Sự kiện", "`chị cá tạo sự kiện` + `Tên | thời gian | mô tả | địa điểm`"),
         ("🔗 Lời mời", "`chị cá` + `tạo link mời`"),
@@ -506,20 +506,22 @@ async def on_message(message):
             raw = message.content
             raw = re.sub(r"(?i)^(chị\s*cá|chica)\s*", "", raw).strip()
             raw = re.sub(r"(?i)^(poll|vote|bầu|bỏ\s*phiếu)\s*", "", raw).strip()
-            options = [o.strip() for o in re.split(r"\||;", raw) if o.strip()]
+            segments = [s.strip() for s in re.split(r"\||;", raw) if s.strip()]
 
-            if len(options) < 2:
+            if len(segments) < 3:
                 await message.channel.send(
                     "Em viết chưa đúng format rồi. "
-                    "Gõ: `poll pizza | phở | cơm` (phân tách bằng `|`) 🐟",
+                    "Gõ: `vote Câu hỏi? | chọn 1 | chọn 2` (phân tách bằng `|`) 🐟",
                     reference=message,
                 )
                 return
 
+            question = segments[0]
+            options = segments[1:]
             if len(options) > 10:
                 options = options[:10]
 
-            poll_text = f"**POLL: {options[0]}**\n"
+            poll_text = f"**POLL: {question}**\n"
             for i, opt in enumerate(options):
                 poll_text += f"{NUMBER_EMOJIS[i]} {opt}\n"
             sender = message.author.display_name or message.author.name
