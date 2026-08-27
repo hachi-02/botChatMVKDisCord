@@ -58,11 +58,11 @@ EVENT_HELP_TEXT = (
 HELP_TEXT = (
     "🐟 Chị Cá đây, chị giúp em được:\n"
     "💬 Nói chuyện: gọi `chị cá` hoặc tag chị\n"
-    "🔍 Tìm web: hỏi kèm \"tìm\", \"là ai\", \"khi nào\"...\n"
-    "👥 Xem thành viên online: \"ai đang online\"\n"
-    "📊 Vote: `vote pizza | phở | cơm`\n"
-    "⏰ Nhắc: `nhắc em 7h học bài`\n"
-    "📅 Tạo sự kiện: `chị cá tạo sự kiện Tên | thời gian | mô tả | địa điểm`\n"
+    "🔍 Tìm web: `chị cá` + hỏi kèm \"tìm\", \"là ai\", \"khi nào\"...\n"
+    "👥 Xem thành viên online: `chị cá` + \"ai đang online\"\n"
+    "📊 Vote: `chị cá` + `vote pizza | phở | cơm`\n"
+    "⏰ Nhắc: `chị cá` + `nhắc em 7h học bài`\n"
+    "📅 Tạo sự kiện: `chị cá tạo sự kiện` + `Tên | thời gian | mô tả | địa điểm`\n"
     "Gõ `chị cá menu` để xem lại nhé!"
 )
 
