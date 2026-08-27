@@ -388,15 +388,30 @@ async def handle_event_creation(message) -> bool:
     else:
         loc_text = channel.mention if channel else ""
 
-    desc_text = f"\n📝 {description}" if description else ""
-
-    await message.channel.send(
-        f"✅ Đã tạo sự kiện **{name}**!\n"
-        f"🕒 Bắt đầu: {start_time.strftime('%H:%M %d/%m/%Y')}\n"
-        f"📍 {loc_text}{desc_text}\n"
-        f"🔔 Chị sẽ nhắc trước {EVENT_REMIND_MINUTES} phút nhé 🐟",
-        reference=message,
+    e = discord.Embed(
+        title=f"📅 {name}",
+        description=(f"📝 {description}" if description else discord.Embed.Empty),
+        color=0x9B59B6,
     )
+    if bot.user:
+        e.set_author(name="Chị Cá 🐟", icon_url=bot.user.display_avatar.url)
+    e.add_field(
+        name="🕒 Bắt đầu",
+        value=start_time.strftime("%H:%M %d/%m/%Y"),
+        inline=True,
+    )
+    e.add_field(
+        name="📍 Địa điểm",
+        value=loc_text or "Online",
+        inline=True,
+    )
+    e.add_field(
+        name="🔔 Nhắc",
+        value=f"Chị sẽ nhắc trước {EVENT_REMIND_MINUTES} phút nhé 🐟",
+        inline=False,
+    )
+    e.set_footer(text=f"✅ Đã tạo sự kiện • {message.author.display_name} tạo")
+    await message.channel.send(embed=e, reference=message)
 
     event_queue.append(
         {
