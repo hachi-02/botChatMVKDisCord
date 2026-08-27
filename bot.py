@@ -589,6 +589,7 @@ async def on_message(message):
             )
             return
 
+        sender_name = message.author.display_name or message.author.name
         system = (
             get_system_prompt(sender_name, get_known_users())
             + "\n\nNHIỆM VỤ THÊM: tóm tắt cuộc hội thoại được cung cấp ở dưới "
