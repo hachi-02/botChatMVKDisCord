@@ -91,11 +91,10 @@ async def handle_gacha(channel, author, bot, n):
 
     roll = discord.Embed(title="🎰 Đang quay...", color=EMBED_COLOR)
     roll.set_image(url=GACHA_ROLL_GIF)
-    await channel.send(embed=roll)
+    msg = await channel.send(embed=roll)
     await asyncio.sleep(2.5)
 
-    for e in embeds:
-        await channel.send(embed=e)
+    await msg.edit(embeds=embeds)
     for r in results:
         await add_card(uid, r["key"], r["rarity"])
 
