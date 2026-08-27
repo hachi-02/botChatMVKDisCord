@@ -45,7 +45,7 @@ def _build_gacha_embeds(results, is_new_list):
         if is_new:
             desc += "\n✨ **MỚI!**"
         e.description = desc
-        e.set_image(url=_anim(r["url"], 150))
+        e.set_image(url=_anim(r["url"], 80))
         embeds.append(e)
     return embeds
 
@@ -107,7 +107,7 @@ async def handle_gacha(channel, author, bot, n):
     roll = discord.Embed(title="🎰 Đang quay...", color=EMBED_COLOR)
     roll.set_image(url=GACHA_ROLL_GIF)
     msg = await channel.send(embed=roll)
-    await asyncio.sleep(5.5)
+    await asyncio.sleep(5.2)
     try:
         await msg.delete()
     except Exception:
