@@ -21,6 +21,7 @@ from config import (
     REMIND_KEYWORDS,
     EVENT_KEYWORDS,
     EVENT_HELP_KEYWORDS,
+    HELP_KEYWORDS,
     EVENT_REMIND_MINUTES,
     EVENT_DEFAULT_DURATION_MINUTES,
     EMOJI_MAP,
@@ -52,6 +53,17 @@ EVENT_HELP_TEXT = (
     "**Ví dụ:**\n"
     "• `chị cá tạo sự kiện Sinh nhật | ngày mai 20h | mang bánh | voice chung`\n"
     "• `chị cá event Offline | 25/12 19h30` 🐟"
+)
+
+HELP_TEXT = (
+    "🐟 Chị Cá đây, chị giúp em được:\n"
+    "💬 Nói chuyện: gọi `chị cá` hoặc tag chị\n"
+    "🔍 Tìm web: hỏi kèm \"tìm\", \"là ai\", \"khi nào\"...\n"
+    "👥 Xem thành viên online: \"ai đang online\"\n"
+    "📊 Vote: `vote pizza | phở | cơm`\n"
+    "⏰ Nhắc: `nhắc em 7h học bài`\n"
+    "📅 Tạo sự kiện: `chị cá tạo sự kiện Tên | thời gian | mô tả | địa điểm`\n"
+    "Gõ `chị cá menu` để xem lại nhé!"
 )
 
 
@@ -363,6 +375,14 @@ async def on_message(message):
         or role_mentioned
         or any(kw in content_lower for kw in KEYWORDS)
     )
+
+    is_general_help = addressed and any(
+        kw in content_lower for kw in HELP_KEYWORDS
+    )
+    if is_general_help:
+        await message.channel.send(HELP_TEXT, reference=message)
+        return
+
     is_event = addressed and any(kw in content_lower for kw in EVENT_KEYWORDS)
     if is_event:
         handled = await handle_event_creation(message)
