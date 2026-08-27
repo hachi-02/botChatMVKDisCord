@@ -97,8 +97,8 @@ def _vgradient(w, h, top, bottom):
     return base
 
 
-MAX_FRAMES = 16
-GIF_FRAME_MS = 80
+MAX_FRAMES = 14
+GIF_FRAME_MS = 90
 
 
 async def _get_img(session, r, w):
@@ -114,7 +114,7 @@ async def _get_img(session, r, w):
 async def warm_image_cache():
     async with aiohttp.ClientSession() as s:
         await asyncio.gather(
-            *[_get_img(s, c, 230) for c in CHARACTER_POOL],
+            *[_get_img(s, c, 190) for c in CHARACTER_POOL],
             return_exceptions=True,
         )
 
@@ -124,8 +124,8 @@ async def _build_montage(results, is_new_list):
     name_font = ImageFont.truetype(font_path, 26) if font_path else ImageFont.load_default()
     tag_font = ImageFont.truetype(font_path, 20) if font_path else ImageFont.load_default()
 
-    cell_w = 230
-    img_h = 320
+    cell_w = 190
+    img_h = 270
     gap = 14
     pad = 16
     radius = 16
@@ -162,36 +162,40 @@ async def _build_montage(results, is_new_list):
             frames = [frames[int(i * step)] for i in range(MAX_FRAMES)]
         cell_frames.append(frames)
 
+    base = _vgradient(total_w, total_h, (28, 30, 35), (43, 45, 49))
+    bdraw = ImageDraw.Draw(base)
+    for i, (r, is_new) in enumerate(zip(results, is_new_list)):
+        x0 = pad + i * (cell_w + gap)
+        y0 = pad
+        rarity_color = _rarity_color(r["rarity"])
+        bdraw.rounded_rectangle(
+            [x0, y0, x0 + cell_w, y0 + img_h],
+            radius=radius,
+            fill=(47, 49, 54),
+            outline=rarity_color,
+            width=3,
+        )
+        name_y = y0 + img_h + 14
+        bdraw.text((x0 + cell_w // 2, name_y), r["name"], font=name_font, fill=rarity_color, anchor="mm")
+        star_y = name_y + 32
+        n_stars = 5 if r["rarity"] in ("5L", "5S") else 4
+        _draw_stars_row(bdraw, x0 + cell_w // 2, star_y, n_stars, 11, (255, 215, 0))
+        if is_new:
+            bdraw.text((x0 + cell_w // 2, star_y + 26), "MỚI!", font=tag_font, fill=(46, 204, 113), anchor="mm")
+
     max_frames = max(len(f) for f in cell_frames)
 
     out_frames = []
     for t in range(max_frames):
-        canvas = _vgradient(total_w, total_h, (28, 30, 35), (43, 45, 49))
-        draw = ImageDraw.Draw(canvas)
-        for i, (r, is_new) in enumerate(zip(results, is_new_list)):
+        frame = base.copy()
+        for i, r in enumerate(results):
             x0 = pad + i * (cell_w + gap)
             y0 = pad
-            rarity_color = _rarity_color(r["rarity"])
-            draw.rounded_rectangle(
-                [x0, y0, x0 + cell_w, y0 + img_h],
-                radius=radius,
-                fill=(47, 49, 54),
-                outline=rarity_color,
-                width=3,
-            )
             fr = cell_frames[i][t % len(cell_frames[i])]
             ix = x0 + (cell_w - fr.width) // 2
             iy = y0 + (img_h - fr.height) // 2
-            canvas.paste(fr, (ix, iy), fr)
-
-            name_y = y0 + img_h + 14
-            draw.text((x0 + cell_w // 2, name_y), r["name"], font=name_font, fill=rarity_color, anchor="mm")
-            star_y = name_y + 32
-            n_stars = 5 if r["rarity"] in ("5L", "5S") else 4
-            _draw_stars_row(draw, x0 + cell_w // 2, star_y, n_stars, 11, (255, 215, 0))
-            if is_new:
-                draw.text((x0 + cell_w // 2, star_y + 26), "MỚI!", font=tag_font, fill=(46, 204, 113), anchor="mm")
-        out_frames.append(canvas)
+            frame.paste(fr, (ix, iy), fr)
+        out_frames.append(frame)
 
     buf = io.BytesIO()
     out_frames[0].save(
