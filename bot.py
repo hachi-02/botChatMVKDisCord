@@ -43,7 +43,7 @@ from search import search_web
 from web_server import start_web_server
 from db import init_db
 from points import maybe_award_points, handle_points, EMBED_COLOR, LEVELUP_GIF
-from gacha.gacha import handle_gacha, handle_collection, GachaView
+from gacha.gacha import handle_gacha, handle_collection, GachaView, warm_image_cache
 
 intents = discord.Intents.default()
 intents.members = True
@@ -414,6 +414,7 @@ async def on_ready():
     await start_web_server()
     bot.loop.create_task(remind_checker())
     bot.loop.create_task(event_reminder_checker())
+    bot.loop.create_task(warm_image_cache())
     if not getattr(bot, "_db_inited", False):
         try:
             await init_db()

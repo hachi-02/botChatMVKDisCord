@@ -111,6 +111,14 @@ async def _get_img(session, r, w):
     return key, data
 
 
+async def warm_image_cache():
+    async with aiohttp.ClientSession() as s:
+        await asyncio.gather(
+            *[_get_img(s, c, 230) for c in CHARACTER_POOL],
+            return_exceptions=True,
+        )
+
+
 async def _build_montage(results, is_new_list):
     font_path = _font_path()
     name_font = ImageFont.truetype(font_path, 26) if font_path else ImageFont.load_default()
@@ -258,19 +266,25 @@ async def handle_gacha(channel, author, bot, n):
     msg = await channel.send(embed=roll)
 
     task = asyncio.create_task(_build_montage(results, is_new_list))
-    await asyncio.sleep(2.0)
+    try:
+        file = await task
+    except Exception as e:
+        print(f"LỖI MONTAGE: {type(e).__name__}: {e}", flush=True)
+        try:
+            await msg.delete()
+        except Exception:
+            pass
+        names = " | ".join(r["name"] for r in results)
+        await channel.send(content=f"🎴 Kết quả quay **{n} lần** của {author.mention}: {names}")
+        for r in results:
+            await add_card(uid, r["key"], r["rarity"])
+        return
+
     try:
         await msg.delete()
     except Exception:
         pass
-
-    try:
-        file = await task
-        await channel.send(content=f"🎴 Kết quả quay **{n} lần** của {author.mention}:", file=file)
-    except Exception as e:
-        print(f"LỖI MONTAGE: {type(e).__name__}: {e}", flush=True)
-        names = " | ".join(r["name"] for r in results)
-        await channel.send(content=f"🎴 Kết quả quay **{n} lần** của {author.mention}: {names}")
+    await channel.send(content=f"🎴 Kết quả quay **{n} lần** của {author.mention}:", file=file)
     for r in results:
         await add_card(uid, r["key"], r["rarity"])
 
