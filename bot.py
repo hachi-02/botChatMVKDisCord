@@ -28,12 +28,19 @@ from config import (
     HELP_KEYWORDS,
     EVENT_REMIND_MINUTES,
     EVENT_DEFAULT_DURATION_MINUTES,
+    DATABASE_URL,
+    POINT_KEYWORDS,
+    POINT_COOLDOWN,
+    POINTS_PER_MSG,
+    POINTS_PER_LEVEL,
     EMOJI_MAP,
 )
 from ai import ai, get_system_prompt, clean_ai_response
 from memory import add_message, get_history, remember_user, get_known_users
 from search import search_web
 from web_server import start_web_server
+from db import init_db
+from points import maybe_award_points, handle_points
 
 intents = discord.Intents.default()
 intents.members = True
@@ -69,6 +76,7 @@ HELP_TEXT = (
     "📅 Tạo sự kiện: `chị cá tạo sự kiện` + `Tên | thời gian | mô tả | địa điểm`\n"
     "🔗 Lời mời: `chị cá` + `tạo link mời`\n"
     "🔎 Tóm tắt: `chị cá` + `tóm tắt 1 tiếng` / `tóm tắt 30 tin`\n"
+    "🏆 Điểm: `chị cá` + `điểm` / `chị cá top`\n"
     "Gõ `chị cá menu` để xem lại nhé!"
 )
 
@@ -362,6 +370,12 @@ async def on_ready():
     await start_web_server()
     bot.loop.create_task(remind_checker())
     bot.loop.create_task(event_reminder_checker())
+    if not getattr(bot, "_db_inited", False):
+        try:
+            await init_db()
+            bot._db_inited = True
+        except Exception as e:
+            print(f"LỖI INIT DB: {type(e).__name__}: {e}", flush=True)
     print("Chị Cá đã sẵn sàng 🐟", flush=True)
 
 
@@ -385,6 +399,8 @@ async def on_message(message):
 
     if message.guild is None:
         return
+
+    await maybe_award_points(message)
 
     bot_mentioned = bot.user in message.mentions
 
@@ -649,6 +665,11 @@ async def on_message(message):
             await message.channel.send(
                 "Chị tóm tắt hơi trục trặc rồi 😭", reference=message
             )
+        return
+
+    is_point = addressed and any(kw in content_lower for kw in POINT_KEYWORDS)
+    if is_point:
+        await handle_points(message)
         return
 
     if not bot_mentioned and not role_mentioned:
