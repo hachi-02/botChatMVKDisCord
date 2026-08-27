@@ -40,7 +40,7 @@ def _build_gacha_embeds(results, is_new_list):
     embeds = []
     for r, is_new in zip(results, is_new_list):
         e = discord.Embed(color=RARITY_COLOR.get(r["rarity"], EMBED_COLOR))
-        e.set_thumbnail(url=_anim(r["url"], 80))
+        e.set_thumbnail(url=_anim(r["url"], 90))
         stars = _star_str(r["rarity"])
         val = f"{stars}  ({RARITY_LABEL[r['rarity']]})"
         if is_new:

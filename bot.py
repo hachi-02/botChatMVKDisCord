@@ -98,6 +98,7 @@ def _menu_embed(bot):
         ("🔗 Lời mời", "`chị cá` + `tạo link mời`"),
         ("🔎 Tóm tắt", "`chị cá` + `tóm tắt 1 tiếng` / `tóm tắt 30 tin`"),
         ("🏆 Điểm", "`chị cá` + `điểm` / `chị cá top`"),
+        ("🎴 Gacha", "`chị cá` + `gacha` / `gacha 1` / `gacha 5` (50đ / 250đ)"),
     ]
     for name, val in items:
         e.add_field(name=name, value=val, inline=True)
