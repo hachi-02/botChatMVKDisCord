@@ -85,3 +85,6 @@ POINT_KEYWORDS = ["điểm", "rank", "xếp hạng", "leaderboard", "top"]
 POINT_COOLDOWN = 30
 POINTS_PER_MSG = 1
 POINTS_PER_LEVEL = 100
+
+GACHA_KEYWORDS = ["gacha", "quay", "roll"]
+COLLECTION_KEYWORDS = ["sở hữu", "collection", "kho", "bộ sưu tập"]

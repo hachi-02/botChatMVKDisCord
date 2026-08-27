@@ -34,6 +34,8 @@ from config import (
     POINTS_PER_MSG,
     POINTS_PER_LEVEL,
     EMOJI_MAP,
+    GACHA_KEYWORDS,
+    COLLECTION_KEYWORDS,
 )
 from ai import ai, get_system_prompt, clean_ai_response
 from memory import add_message, get_history, remember_user, get_known_users
@@ -41,6 +43,7 @@ from search import search_web
 from web_server import start_web_server
 from db import init_db
 from points import maybe_award_points, handle_points, EMBED_COLOR, LEVELUP_GIF
+from gacha.gacha import handle_gacha, handle_collection, GachaView
 
 intents = discord.Intents.default()
 intents.members = True
@@ -687,6 +690,32 @@ async def on_message(message):
             await message.channel.send(
                 "Chị tóm tắt hơi trục trặc rồi 😭", reference=message
             )
+        return
+
+    is_gacha = addressed and any(kw in content_lower for kw in GACHA_KEYWORDS)
+    if is_gacha:
+        cl = message.content.lower()
+        if "5" in cl:
+            n = 5
+        elif "1" in cl:
+            n = 1
+        else:
+            n = None
+        if n:
+            await handle_gacha(message.channel, message.author, bot, n)
+        else:
+            e = discord.Embed(
+                title="🎰 Gacha Thẻ Genshin",
+                description="Chọn số lượt quay:",
+                color=EMBED_COLOR,
+            )
+            e.set_footer(text="1 lần = 50đ • 5 lần = 250đ")
+            await message.channel.send(embed=e, view=GachaView(bot, message.author))
+        return
+
+    is_collection = addressed and any(kw in content_lower for kw in COLLECTION_KEYWORDS)
+    if is_collection:
+        await handle_collection(message.channel, message.author, bot)
         return
 
     is_point = addressed and any(kw in content_lower for kw in POINT_KEYWORDS)
