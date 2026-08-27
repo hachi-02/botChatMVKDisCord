@@ -85,6 +85,3 @@ POINT_KEYWORDS = ["điểm", "rank", "xếp hạng", "leaderboard", "top"]
 POINT_COOLDOWN = 30
 POINTS_PER_MSG = 1
 POINTS_PER_LEVEL = 100
-
-SHOW_KEYWORDS = ["show", "xem ảnh", "test ảnh"]
-TEST_CARD_IMG = "https://res.cloudinary.com/z2ffqaaf/image/upload/v1787825198/Ningguang_Dynamic_Skin_fadlzu.webp"

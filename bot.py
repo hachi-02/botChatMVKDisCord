@@ -34,8 +34,6 @@ from config import (
     POINTS_PER_MSG,
     POINTS_PER_LEVEL,
     EMOJI_MAP,
-    SHOW_KEYWORDS,
-    TEST_CARD_IMG,
 )
 from ai import ai, get_system_prompt, clean_ai_response
 from memory import add_message, get_history, remember_user, get_known_users
@@ -694,13 +692,6 @@ async def on_message(message):
     is_point = addressed and any(kw in content_lower for kw in POINT_KEYWORDS)
     if is_point:
         await handle_points(message, bot)
-        return
-
-    is_show = addressed and any(kw in content_lower for kw in SHOW_KEYWORDS)
-    if is_show:
-        e = discord.Embed(title="🎴 Test thẻ", color=EMBED_COLOR)
-        e.set_image(url=TEST_CARD_IMG)
-        await message.channel.send(embed=e, reference=message)
         return
 
     if not bot_mentioned and not role_mentioned:
