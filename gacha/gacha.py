@@ -1,6 +1,8 @@
 import asyncio
+import io
 import random
 
+import aiohttp
 import discord
 
 from db import (
@@ -26,6 +28,16 @@ SOFT_MAX_RATE = 0.33
 GACHA_ROLL_GIF = "https://res.cloudinary.com/z2ffqaaf/video/upload/f_gif,du_3,w_300/animationgacha_yjdofs.mp4"
 
 NAME_BY_KEY = {c["key"]: c["name"] for c in CHARACTER_POOL}
+
+
+def _thumb(url, w=400):
+    return url.replace("/upload/", f"/upload/w_{w}/", 1)
+
+
+async def _fetch_image(session, url):
+    async with session.get(url) as resp:
+        resp.raise_for_status()
+        return await resp.read()
 
 
 def roll_one(state):
@@ -75,26 +87,38 @@ async def handle_gacha(channel, author, bot, n):
 
     owned = {c["char_key"]: c["dup_count"] for c in await get_collection(uid)}
     local_seen = {}
-    embeds = []
-    for r in results:
-        base = owned.get(r["key"], 0)
-        seen = local_seen.get(r["key"], 0)
-        total = base + seen
-        is_new = total == 0
-        e = discord.Embed(title=r["name"], color=RARITY_COLOR[r["rarity"]])
-        e.set_image(url=r["url"])
-        e.set_footer(
-            text=f"{RARITY_LABEL[r['rarity']]} • " + ("MỚI!" if is_new else f"TRÙNG x{total + 1}")
-        )
-        embeds.append(e)
-        local_seen[r["key"]] = seen + 1
+    lines = []
+    files = []
+    async with aiohttp.ClientSession() as s:
+        for i, r in enumerate(results, 1):
+            base = owned.get(r["key"], 0)
+            seen = local_seen.get(r["key"], 0)
+            total = base + seen
+            is_new = total == 0
+            label = "MỚI!" if is_new else f"TRÙNG x{total + 1}"
+            lines.append(f"{i}. **{r['name']}** ({RARITY_LABEL[r['rarity']]}) — {label}")
+            try:
+                data = await _fetch_image(s, _thumb(r["url"], 400))
+                ext = "webp" if "webp" in r["url"] else "gif"
+                files.append(discord.File(io.BytesIO(data), filename=f"{r['key']}.{ext}"))
+            except Exception as e:
+                print(f"LỖI FETCH IMG: {type(e).__name__}: {e}", flush=True)
+            local_seen[r["key"]] = seen + 1
 
     roll = discord.Embed(title="🎰 Đang quay...", color=EMBED_COLOR)
     roll.set_image(url=GACHA_ROLL_GIF)
     msg = await channel.send(embed=roll)
     await asyncio.sleep(2.5)
+    try:
+        await msg.delete()
+    except Exception:
+        pass
 
-    await msg.edit(embeds=embeds)
+    content = f"🎴 Kết quả quay **{n} lần** của {author.mention}:\n" + "\n".join(lines)
+    if files:
+        await channel.send(content=content, files=files)
+    else:
+        await channel.send(content=content)
     for r in results:
         await add_card(uid, r["key"], r["rarity"])
 
