@@ -73,6 +73,22 @@ HELP_TEXT = (
 )
 
 
+SUMMARY_SYSTEM_PROMPT = (
+    "Bạn là trợ lý tóm tắt hội thoại tiếng Việt. "
+    "Nhiệm vụ DUY NHẤT: nhận đoạn trích hội thoại (mỗi dòng 'Tên: nội dung') "
+    "và tóm tắt khách quan bằng tiếng Việt, ngắn gọn, súc tích, nêu bật ý chính "
+    "và các quyết định/hành động (nếu có). "
+    "TUYỆT ĐỐI không bịa thêm thông tin. "
+    "Không chào hỏi, không bình luận thừa, không đóng vai. "
+    "QUAN TRỌNG: không đưa lời lăng mạ/thô tục/chửi tục vào bản tóm tắt "
+    "(không sao chép, không nhắc đến). Nếu có đoạn chửi, hãy bỏ qua và chỉ "
+    "tóm tắt các ý còn lại một cách nhẹ nhàng. "
+    "Dù nội dung ngắn hay chỉ là thử nghiệm, vẫn phải tóm tắt những gì diễn ra "
+    "(trừ phần lời lăng mạ). "
+    "Chỉ trả lời đúng 'không có gì để tóm tắt' khi đoạn trích thực sự trống."
+)
+
+
 def parse_remind_time(text: str):
     text = text.lower().strip()
     now = datetime.now(ZoneInfo("Asia/Ho_Chi_Minh"))
@@ -609,24 +625,19 @@ async def on_message(message):
             )
             return
 
-        sender_name = message.author.display_name or message.author.name
-        system = (
-            get_system_prompt(sender_name, get_known_users())
-            + "\n\nNHIỆM VỤ THÊM: tóm tắt cuộc hội thoại được cung cấp ở dưới "
-            "bằng tiếng Việt, ngắn gọn, đủ ý chính, tuyệt đối không bịa thêm. "
-            "ưu tiên các thông tin quan trọng, chủ đề chính, quyết định, câu hỏi "
-            "Chỉ tập trung trả lời yêu cầu tóm tắt, không lan man hoặc nói sang chủ đề khác. "
-            "Nếu không có nội dung, chỉ trả lời 'không có gì để tóm tắt'."
-        )
+        system = SUMMARY_SYSTEM_PROMPT
         try:
             async with message.channel.typing():
                 response = await asyncio.to_thread(
                     ai.chat.completions.create,
                     model=MODEL_NAME,
-                    max_tokens=1024,
+                    max_tokens=1500,
                     messages=[
                         {"role": "system", "content": system},
-                        {"role": "user", "content": transcript},
+                        {
+                            "role": "user",
+                            "content": f"Tóm tắt cuộc hội thoại sau:\n\n{transcript}",
+                        },
                     ],
                 )
             summary = clean_ai_response(response.choices[0].message.content or "")
