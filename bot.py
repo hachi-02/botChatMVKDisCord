@@ -564,28 +564,48 @@ async def on_message(message):
             if m_count:
                 limit = min(int(m_count.group(1)), SUMMARY_MAX)
 
-        if after:
-            msgs = [
-                m
-                async for m in message.channel.history(
-                    after=after, before=message, limit=SUMMARY_MAX
-                )
-            ]
-        else:
-            msgs = [
-                m
-                async for m in message.channel.history(
-                    limit=limit, before=message
-                )
-            ]
+        try:
+            if after:
+                msgs = [
+                    m
+                    async for m in message.channel.history(
+                        after=after, before=message, limit=SUMMARY_MAX
+                    )
+                ]
+            else:
+                msgs = [
+                    m
+                    async for m in message.channel.history(
+                        limit=limit, before=message
+                    )
+                ]
+        except Exception as e:
+            print(f"LỖI SUMMARY FETCH: {type(e).__name__}: {e}", flush=True)
+            await message.channel.send(
+                "Chị không lấy được lịch sử kênh 😭 (bot cần quyền **Read Message History**).",
+                reference=message,
+            )
+            return
+
+        if not msgs and after is None:
+            msgs = [m async for m in message.channel.history(limit=limit)]
+            msgs = [m for m in msgs if m.id != message.id]
 
         msgs.reverse()
         transcript = "\n".join(
-            f"{m.author.display_name}: {m.content}" for m in msgs if m.content
+            f"{m.author.display_name}: {m.content}"
+            for m in msgs
+            if m.content or m.attachments or m.embeds
+        )
+        print(
+            f"SUMMARY debug: raw={raw!r} after={after} limit={limit} "
+            f"msgs={len(msgs)} transcript_len={len(transcript)}",
+            flush=True,
         )
         if not transcript.strip():
             await message.channel.send(
-                "Chị không có gì để tóm tắt hết 🐟", reference=message
+                "Chị không thấy tin nhắn nào trước đó trong kênh này để tóm tắt 🐟",
+                reference=message,
             )
             return
 
