@@ -88,3 +88,11 @@ POINTS_PER_LEVEL = 200
 
 GACHA_KEYWORDS = ["gacha", "quay", "roll"]
 COLLECTION_KEYWORDS = ["sở hữu", "collection", "kho", "bộ sưu tập"]
+
+PVP_KEYWORDS = ["pvp", "pk", "thách đấu"]
+PVP_TEAM_SIZE = 3
+PVP_MAX_ROUND = 50
+PVP_K = 32
+PVP_START_RATING = 1000
+PVP_ACCEPT_TIMEOUT = 60
+PVP_BATTLE_ANIM_GIF = "https://res.cloudinary.com/z2ffqaaf/image/upload/v1787830778/animationgacha_grcwt8.webp"

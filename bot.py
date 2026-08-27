@@ -36,7 +36,9 @@ from config import (
     EMOJI_MAP,
     GACHA_KEYWORDS,
     COLLECTION_KEYWORDS,
+    PVP_KEYWORDS,
 )
+from game.pvp.ui import start_pvp_challenge, handle_pvp_rank
 from ai import ai, get_system_prompt, clean_ai_response
 from memory import add_message, get_history, remember_user, get_known_users
 from search import search_web
@@ -747,6 +749,15 @@ async def on_message(message):
     is_point = addressed and any(kw in content_lower for kw in POINT_KEYWORDS)
     if is_point:
         await handle_points(message, bot)
+        return
+
+    is_pvp = addressed and any(kw in content_lower for kw in PVP_KEYWORDS)
+    if is_pvp:
+        cl = message.content.lower()
+        if any(k in cl for k in ("rank", "top", "xếp hạng", "leaderboard", "bảng")):
+            await handle_pvp_rank(message, bot)
+        else:
+            await start_pvp_challenge(message, bot)
         return
 
     if not bot_mentioned and not role_mentioned:

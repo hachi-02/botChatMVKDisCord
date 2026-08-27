@@ -29,6 +29,15 @@ GACHA_SCHEMA_SQL = (
     " PRIMARY KEY (user_id, char_key));",
 )
 
+PVP_SCHEMA_SQL = (
+    "CREATE TABLE IF NOT EXISTS pvp_rank ("
+    " user_id BIGINT PRIMARY KEY,"
+    " rating INTEGER NOT NULL DEFAULT 1000,"
+    " wins INTEGER NOT NULL DEFAULT 0,"
+    " losses INTEGER NOT NULL DEFAULT 0,"
+    " last TIMESTAMPTZ);",
+)
+
 
 def _clean_dsn(dsn: str) -> str:
     """asyncpg không hiểu một số param của Neon (vd channel_binding)."""
@@ -44,6 +53,8 @@ async def _ensure_schema():
     async with db_pool.acquire() as conn:
         await conn.execute(SCHEMA_SQL)
         for s in GACHA_SCHEMA_SQL:
+            await conn.execute(s)
+        for s in PVP_SCHEMA_SQL:
             await conn.execute(s)
         await conn.execute(
             "ALTER TABLE points DROP COLUMN IF EXISTS max_level"
@@ -69,6 +80,8 @@ async def init_db():
     async with pool.acquire() as conn:
         await conn.execute(SCHEMA_SQL)
         for s in GACHA_SCHEMA_SQL:
+            await conn.execute(s)
+        for s in PVP_SCHEMA_SQL:
             await conn.execute(s)
     db_pool = pool
     _schema_ready = True
@@ -215,3 +228,66 @@ async def get_collection(user_id: int):
         "ORDER BY rarity, char_key",
         user_id,
     )
+
+
+async def get_pvp_rating(user_id: int):
+    if db_pool is None:
+        return 1000
+    await _ensure_schema()
+    row = await db_pool.fetchrow(
+        "SELECT rating, wins, losses FROM pvp_rank WHERE user_id=$1", user_id
+    )
+    if row is None:
+        return 1000
+    return row
+
+
+async def get_pvp_top(limit: int = 10):
+    if db_pool is None:
+        return []
+    await _ensure_schema()
+    return await db_pool.fetch(
+        "SELECT user_id, rating, wins, losses FROM pvp_rank "
+        "ORDER BY rating DESC LIMIT $1",
+        limit,
+    )
+
+
+async def update_pvp_result(
+    winner_id: int, loser_id: int,
+    new_winner_rating: int, new_loser_rating: int,
+    draw: bool = False,
+):
+    if db_pool is None:
+        return
+    try:
+        await _ensure_schema()
+        if draw:
+            await db_pool.execute(
+                "INSERT INTO pvp_rank(user_id, rating, wins, losses, last) "
+                "VALUES($1,$2,0,0,now()) "
+                "ON CONFLICT(user_id) DO UPDATE SET rating=$2, last=now()",
+                winner_id, new_winner_rating,
+            )
+            await db_pool.execute(
+                "INSERT INTO pvp_rank(user_id, rating, wins, losses, last) "
+                "VALUES($1,$2,0,0,now()) "
+                "ON CONFLICT(user_id) DO UPDATE SET rating=$2, last=now()",
+                loser_id, new_loser_rating,
+            )
+            return
+        await db_pool.execute(
+            "INSERT INTO pvp_rank(user_id, rating, wins, losses, last) "
+            "VALUES($1,$2,1,0,now()) "
+            "ON CONFLICT(user_id) DO UPDATE SET rating=$2, wins=wins+1, last=now()",
+            winner_id, new_winner_rating,
+        )
+        await db_pool.execute(
+            "INSERT INTO pvp_rank(user_id, rating, wins, losses, last) "
+            "VALUES($1,$2,0,1,now()) "
+            "ON CONFLICT(user_id) DO UPDATE SET rating=$2, losses=losses+1, last=now()",
+            loser_id, new_loser_rating,
+        )
+    except Exception as e:
+        print(f"LỖI UPDATE_PVP_RESULT: {type(e).__name__}: {e}", flush=True)
+
