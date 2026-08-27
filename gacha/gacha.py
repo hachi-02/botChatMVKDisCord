@@ -39,13 +39,14 @@ def _star_str(rarity):
 def _build_gacha_embeds(results, is_new_list):
     embeds = []
     for r, is_new in zip(results, is_new_list):
-        e = discord.Embed(title=r["name"], color=RARITY_COLOR.get(r["rarity"], EMBED_COLOR))
+        e = discord.Embed(color=RARITY_COLOR.get(r["rarity"], EMBED_COLOR))
+        e.set_thumbnail(url=_anim(r["url"], 80))
         stars = _star_str(r["rarity"])
-        desc = f"{stars}  ({RARITY_LABEL[r['rarity']]})"
+        val = f"{stars}  ({RARITY_LABEL[r['rarity']]})"
         if is_new:
-            desc += "\n✨ **MỚI!**"
-        e.description = desc
-        e.set_image(url=_anim(r["url"], 80))
+            val += "\n✨ **MỚI!**"
+        e.add_field(name="\u200b", value="\u200b", inline=True)
+        e.add_field(name=r["name"], value=val, inline=True)
         embeds.append(e)
     return embeds
 
