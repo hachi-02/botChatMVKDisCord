@@ -669,7 +669,7 @@ async def on_message(message):
 
     is_point = addressed and any(kw in content_lower for kw in POINT_KEYWORDS)
     if is_point:
-        await handle_points(message)
+        await handle_points(message, bot)
         return
 
     if not bot_mentioned and not role_mentioned:

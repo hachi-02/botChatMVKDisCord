@@ -20,7 +20,7 @@ async def maybe_award_points(message):
         asyncio.create_task(add_points(uid, POINTS_PER_MSG))
 
 
-async def handle_points(message):
+async def handle_points(message, bot):
     content_lower = message.content.lower()
     if any(k in content_lower for k in ("top", "xếp hạng", "leaderboard")):
         rows = await get_top(10)
@@ -31,7 +31,9 @@ async def handle_points(message):
         for i, r in enumerate(rows, 1):
             uid = r["user_id"]
             pts = r["points"]
-            user = message.client.get_user(uid) or await message.client.fetch_user(uid)
+            user = message.guild.get_member(uid) if message.guild else None
+            if user is None:
+                user = bot.get_user(uid) or await bot.fetch_user(uid)
             name = user.display_name if user else f"user {uid}"
             lines.append(f"{i}. {name}: {pts}đ")
         await message.channel.send("🏆 Top 10:\n" + "\n".join(lines), reference=message)
