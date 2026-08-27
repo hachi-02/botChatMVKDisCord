@@ -67,7 +67,7 @@ SUMMARY_MAX = 500
 HELP_KEYWORDS = ["menu", "help"]
 EVENT_HELP_KEYWORDS = [
     "như nào", "cách", "hướng dẫn", "làm sao", "như thế nào",
-    "dùng sao", "guide", "how to", "how",
+    "dùng sao", "guide", "how to", "how","chỉ"
 ]
 EVENT_REMIND_MINUTES = 15
 EVENT_DEFAULT_DURATION_MINUTES = 120
@@ -85,3 +85,6 @@ POINT_KEYWORDS = ["điểm", "rank", "xếp hạng", "leaderboard", "top"]
 POINT_COOLDOWN = 30
 POINTS_PER_MSG = 1
 POINTS_PER_LEVEL = 100
+
+SHOW_KEYWORDS = ["show", "xem ảnh", "test ảnh"]
+TEST_CARD_IMG = "https://res.cloudinary.com/z2ffqaaf/image/upload/v1787825198/Ningguang_Dynamic_Skin_fadlzu.webp"
