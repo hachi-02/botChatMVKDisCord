@@ -19,6 +19,9 @@ from config import (
     MEMBER_KEYWORDS,
     POLL_KEYWORDS,
     REMIND_KEYWORDS,
+    EVENT_KEYWORDS,
+    EVENT_REMIND_MINUTES,
+    EVENT_DEFAULT_DURATION_MINUTES,
     EMOJI_MAP,
 )
 from ai import ai, get_system_prompt, clean_ai_response
@@ -34,6 +37,7 @@ intents.message_content = True
 bot = discord.Client(intents=intents)
 
 remind_queue = []
+event_queue = []
 
 NUMBER_EMOJIS = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"]
 
@@ -155,11 +159,159 @@ async def remind_checker():
         await asyncio.sleep(10)
 
 
+async def event_reminder_checker():
+    await bot.wait_until_ready()
+    while not bot.is_closed():
+        try:
+            now = datetime.now(ZoneInfo("Asia/Ho_Chi_Minh"))
+            due = [
+                e
+                for e in event_queue
+                if not e.get("notified")
+                and timedelta(0)
+                <= (e["time"] - now)
+                <= timedelta(minutes=EVENT_REMIND_MINUTES)
+            ]
+            for e in due:
+                e["notified"] = True
+                channel = bot.get_channel(e["channel_id"])
+                if channel:
+                    await channel.send(
+                        f"🔔 Sự kiện **{e['name']}** sắp bắt đầu trong khoảng "
+                        f"{EVENT_REMIND_MINUTES} phút nữa! (@everyone) 🐟"
+                    )
+            event_queue[:] = [e for e in event_queue if e["time"] > now]
+        except Exception as e:
+            print(f"LỖI EVENT_REMINDER: {e}", flush=True)
+        await asyncio.sleep(30)
+
+
+async def handle_event_creation(message) -> bool:
+    raw = message.content
+    raw = re.sub(
+        r"(?i)^(chị\s*cá|chica|chicá|chị ca|cá ơi|ca ơi|ê chị cá|ê chica|chị cá ơi|chica ơi)\s*",
+        "",
+        raw,
+    ).strip()
+    raw = re.sub(
+        r"(?i)^(tạo sự kiện|tạo event|lên lịch|event|schedule)\s*", "", raw
+    ).strip()
+
+    if bot.user:
+        raw = raw.replace(bot.user.mention, "")
+        raw = raw.replace(f"<@{bot.user.id}>", "")
+        raw = raw.replace(f"<@!{bot.user.id}>", "")
+    for role in message.role_mentions:
+        raw = raw.replace(role.mention, "")
+    raw = raw.strip()
+
+    if "|" not in raw:
+        return False
+
+    parts = [p.strip() for p in raw.split("|") if p.strip()]
+
+    if len(parts) < 2:
+        await message.channel.send(
+            "Chị chưa rõ thông tin sự kiện!\n"
+            "**📌 Format:**\n"
+            "`chị cá tạo sự kiện Tên | thời gian | mô tả | địa điểm`\n"
+            "• Tên và thời gian là bắt buộc.\n"
+            "• Mô tả và địa điểm không bắt buộc.\n"
+            "**Ví dụ:**\n"
+            "• `chị cá tạo sự kiện Sinh nhật | ngày mai 20h | mang bánh | voice chung`\n"
+            "• `chị cá event Offline | 25/12 19h30`",
+            reference=message,
+        )
+        return True
+
+    name = parts[0]
+    time_text = parts[1]
+    description = parts[2] if len(parts) > 2 else ""
+    location = parts[3] if len(parts) > 3 else ""
+
+    start_time = parse_remind_time(time_text)
+    now = datetime.now(ZoneInfo("Asia/Ho_Chi_Minh"))
+    if not start_time or start_time <= now:
+        await message.channel.send(
+            "Chị chưa hiểu thời gian sự kiện, hoặc thời gian đã qua!\n"
+            "**Ví dụ thời gian:** `ngày mai 20h`, `25/12 19h30`, `7h`, `30 phút nữa` 🐟",
+            reference=message,
+        )
+        return True
+
+    end_time = start_time + timedelta(minutes=EVENT_DEFAULT_DURATION_MINUTES)
+
+    guild = message.guild
+    if not guild:
+        return True
+
+    entity_type = discord.EntityType.external
+    channel = None
+    if location:
+        voice_channel = discord.utils.get(
+            guild.voice_channels, name__iexact=location
+        )
+        if voice_channel:
+            entity_type = discord.EntityType.voice
+            channel = voice_channel
+            location = ""
+
+    if entity_type == discord.EntityType.external and not location:
+        location = "Online"
+
+    try:
+        event = await guild.create_scheduled_event(
+            name=name,
+            start_time=start_time,
+            end_time=end_time,
+            description=description or None,
+            entity_type=entity_type,
+            channel=channel,
+            location=location if entity_type == discord.EntityType.external else None,
+            privacy_level=discord.PrivacyLevel.guild_only,
+        )
+    except Exception as e:
+        print(f"LỖI CREATE EVENT: {type(e).__name__}: {e}", flush=True)
+        await message.channel.send(
+            "Chị không tạo được sự kiện 😭 (có thể bot thiếu quyền **Manage Events** "
+            "hoặc server không hỗ trợ Scheduled Events).",
+            reference=message,
+        )
+        return True
+
+    if entity_type == discord.EntityType.external:
+        loc_text = location
+    else:
+        loc_text = channel.mention if channel else ""
+
+    desc_text = f"\n📝 {description}" if description else ""
+
+    await message.channel.send(
+        f"✅ Đã tạo sự kiện **{name}**!\n"
+        f"🕒 Bắt đầu: {start_time.strftime('%H:%M %d/%m/%Y')}\n"
+        f"📍 {loc_text}{desc_text}\n"
+        f"🔔 Chị sẽ nhắc trước {EVENT_REMIND_MINUTES} phút nhé 🐟",
+        reference=message,
+    )
+
+    event_queue.append(
+        {
+            "event_id": event.id,
+            "name": name,
+            "time": start_time,
+            "channel_id": message.channel.id,
+            "notified": False,
+        }
+    )
+    return True
+
+
 @bot.event
 async def on_ready():
     print(f"Bot đã online: {bot.user}", flush=True)
     await start_web_server()
     bot.loop.create_task(remind_checker())
+    bot.loop.create_task(event_reminder_checker())
     print("Chị Cá đã sẵn sàng 🐟", flush=True)
 
 
@@ -189,6 +341,17 @@ async def on_message(message):
     role_mentioned = any(role.id == ROLE_ID for role in message.role_mentions)
 
     content_lower = message.content.lower()
+
+    addressed = (
+        bot_mentioned
+        or role_mentioned
+        or any(kw in content_lower for kw in KEYWORDS)
+    )
+    is_event = addressed and any(kw in content_lower for kw in EVENT_KEYWORDS)
+    if is_event:
+        handled = await handle_event_creation(message)
+        if handled:
+            return
 
     if not bot_mentioned and not role_mentioned:
         if not any(kw in content_lower for kw in KEYWORDS):

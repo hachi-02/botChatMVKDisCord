@@ -59,6 +59,10 @@ POLL_KEYWORDS = ["poll", "vote", "bầu", "bỏ phiếu"]
 
 REMIND_KEYWORDS = ["nhắc t", "remind", "nhắc tôi", "nhắc em"]
 
+EVENT_KEYWORDS = ["tạo sự kiện", "tạo event", "lên lịch", "event", "schedule"]
+EVENT_REMIND_MINUTES = 15
+EVENT_DEFAULT_DURATION_MINUTES = 120
+
 EMOJI_MAP = {
     "[MEOW]": "<:skirkmeow:1471088875106730106>",
     "[HEART]": "<:skirkheart:1471089365500559455>",
