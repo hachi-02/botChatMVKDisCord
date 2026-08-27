@@ -27,7 +27,7 @@ PITY_4 = 10
 RATE_5 = 0.006
 RATE_50_50 = 0.5
 SOFT_MAX_RATE = 0.33
-GACHA_ROLL_GIF = "https://res.cloudinary.com/z2ffqaaf/video/upload/f_gif,du_3,w_300/animationgacha_yjdofs.mp4"
+GACHA_ROLL_GIF = "https://res.cloudinary.com/z2ffqaaf/image/upload/v1787830778/animationgacha_grcwt8.webp"
 
 NAME_BY_KEY = {c["key"]: c["name"] for c in CHARACTER_POOL}
 
