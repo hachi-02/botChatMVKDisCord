@@ -88,7 +88,7 @@ async def handle_points(message, bot):
             embed.add_field(
                 name=f"{medals.get(i, f'#{i}')} {name}",
                 value=f"**{pts}đ** • Cấp {lvl}",
-                inline=True,
+                inline=False,
             )
         now = datetime.now(ZoneInfo("Asia/Ho_Chi_Minh")).strftime("%H:%M %d/%m")
         embed.set_footer(text=f"📊 Tổng {total}đ • Cập nhật {now}")
