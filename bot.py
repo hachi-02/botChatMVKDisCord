@@ -248,8 +248,9 @@ async def handle_event_creation(message) -> bool:
     entity_type = discord.EntityType.external
     channel = None
     if location:
-        voice_channel = discord.utils.get(
-            guild.voice_channels, name__iexact=location
+        voice_channel = discord.utils.find(
+            lambda c: c.name.casefold() == location.casefold(),
+            guild.voice_channels,
         )
         if voice_channel:
             entity_type = discord.EntityType.voice
@@ -259,22 +260,27 @@ async def handle_event_creation(message) -> bool:
     if entity_type == discord.EntityType.external and not location:
         location = "Online"
 
+    kwargs = dict(
+        name=name,
+        start_time=start_time,
+        end_time=end_time,
+        description=description or None,
+        entity_type=entity_type,
+        privacy_level=discord.PrivacyLevel.guild_only,
+    )
+    if entity_type == discord.EntityType.external:
+        kwargs["location"] = location
+        kwargs["channel"] = discord.utils.MISSING
+    else:
+        kwargs["channel"] = channel
+        kwargs["location"] = discord.utils.MISSING
+
     try:
-        event = await guild.create_scheduled_event(
-            name=name,
-            start_time=start_time,
-            end_time=end_time,
-            description=description or None,
-            entity_type=entity_type,
-            channel=channel,
-            location=location if entity_type == discord.EntityType.external else None,
-            privacy_level=discord.PrivacyLevel.guild_only,
-        )
+        event = await guild.create_scheduled_event(**kwargs)
     except Exception as e:
         print(f"LỖI CREATE EVENT: {type(e).__name__}: {e}", flush=True)
         await message.channel.send(
-            "Chị không tạo được sự kiện 😭 (có thể bot thiếu quyền **Manage Events** "
-            "hoặc server không hỗ trợ Scheduled Events).",
+            f"Chị không tạo được sự kiện 😭 Lỗi: `{type(e).__name__}: {e}`",
             reference=message,
         )
         return True
