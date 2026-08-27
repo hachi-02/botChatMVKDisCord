@@ -40,7 +40,7 @@ from memory import add_message, get_history, remember_user, get_known_users
 from search import search_web
 from web_server import start_web_server
 from db import init_db
-from points import maybe_award_points, handle_points, EMBED_COLOR
+from points import maybe_award_points, handle_points, EMBED_COLOR, LEVELUP_GIF
 
 intents = discord.Intents.default()
 intents.members = True
@@ -81,9 +81,9 @@ def _event_help_embed(bot):
 
 
 def _menu_embed(bot):
-    e = discord.Embed(title="🐟 Menu Chị Cá", color=EMBED_COLOR)
+    e = discord.Embed(title="Menu Chị Cá", color=EMBED_COLOR)
     if bot.user:
-        e.set_author(name="Chị Cá 🐟", icon_url=bot.user.display_avatar.url)
+        e.set_author(name="Chị Cá", icon_url=LEVELUP_GIF)
     items = [
         ("💬 Nói chuyện", "Gọi `chị cá` hoặc tag chị"),
         ("🔍 Tìm web", "`chị cá` + \"tìm\", \"là ai\", \"khi nào\"..."),

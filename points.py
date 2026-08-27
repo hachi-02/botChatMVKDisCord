@@ -8,6 +8,7 @@ from db import add_points, get_points, get_rank, get_top
 
 cooldown = {}
 EMBED_COLOR = 0x1ABC9C
+LEVELUP_GIF = "https://media.giphy.com/media/v1.Y2lkPWVjZjA1ZTQ3dzd6ZDF0ZnJ1aXRlMzc1ZzV2M29zdnVteGN2ODN3MXExZmszaDlwdyZlcD12MV9naWZzX3NlYXJjaCZjdD1n/sIYOpmEC16sWVQtOs3/giphy.gif"
 
 
 def _bar(done, total=POINTS_PER_LEVEL, size=10):
