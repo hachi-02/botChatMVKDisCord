@@ -1,11 +1,12 @@
 import asyncio
-import random
 
 import discord
 
 from config import (
     PVP_TEAM_SIZE,
     PVP_ACCEPT_TIMEOUT,
+    PVP_TURN_TIMEOUT,
+    PVP_ENERGY_MAX,
     PVP_START_RATING,
     PVP_BATTLE_ANIM_GIF,
 )
@@ -20,9 +21,8 @@ from .cards import (
     ROLE_LABEL,
     ROLE_COLOR,
     ELEMENT_EMOJI,
-    RARITY_BY_KEY,
 )
-from .engine import resolve_battle
+from .engine import BattleSession
 from .ranks import compute_elo, compute_elo_draw, START_RATING
 
 PVP_COLOR = 0x9B59B6
@@ -164,47 +164,128 @@ async def _begin_selection(interaction, session: PVPSession, side: str):
     )
 
 
-# ====================== RESOLVE ======================
+# ====================== BATTLE (interactive) ======================
+class ActionView(discord.ui.View):
+    def __init__(self, battle: BattleSession, fighter):
+        super().__init__(timeout=PVP_TURN_TIMEOUT)
+        self.battle = battle
+        self.fighter = fighter
+        self.children[2].disabled = fighter.energy < PVP_ENERGY_MAX
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        return interaction.user.id == self.battle._owner(self.fighter).id
+
+    @discord.ui.button(label="⚔️ Đánh thường", style=discord.ButtonStyle.secondary)
+    async def normal(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self._act(interaction, "normal")
+
+    @discord.ui.button(label="🔥 Skill", style=discord.ButtonStyle.primary)
+    async def skill(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self._act(interaction, "skill")
+
+    @discord.ui.button(label="✨ Ultimate", style=discord.ButtonStyle.danger)
+    async def ult(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self._act(interaction, "ultimate")
+
+    async def _act(self, interaction: discord.Interaction, action: str):
+        self.battle.apply_action(self.fighter, action)
+        for item in self.children:
+            item.disabled = True
+        await interaction.response.edit_message(view=self)
+        await _after_action(self.battle)
+
+    async def on_timeout(self):
+        if self.battle.done or not self.fighter.alive:
+            await _after_action(self.battle)
+            return
+        self.battle.apply_action(self.fighter, "normal")
+        for item in self.children:
+            item.disabled = True
+        await _after_action(self.battle)
+
+
 async def _resolve(session: PVPSession, interaction: discord.Interaction):
     if session.done or not session.a_cards or not session.b_cards:
         return
     pending_challenges.discard(_challenge_key(session.challenger.id, session.target.id))
     session.done = True
 
-    result = resolve_battle(session.a_cards, session.b_cards)
-
-    ra_row = await get_pvp_rating(session.challenger.id)
-    rb_row = await get_pvp_rating(session.target.id)
-    ra = ra_row["rating"] if ra_row else START_RATING
-    rb = rb_row["rating"] if rb_row else START_RATING
-
-    if result["winner"] == "A":
-        na, nb = compute_elo(ra, rb)
-        win_user, lose_user = session.challenger, session.target
-        draw = False
-    elif result["winner"] == "B":
-        nb, na = compute_elo(rb, ra)
-        win_user, lose_user = session.target, session.challenger
-        draw = False
-    else:
-        na, nb = compute_elo_draw(ra, rb)
-        win_user, lose_user = None, None
-        draw = True
-
-    await update_pvp_result(session.challenger.id, session.target.id, na, nb, draw)
-
-    anim = discord.Embed(title="⚔️ Đang chiến đấu...", color=PVP_COLOR)
+    battle = BattleSession(
+        session.a_cards, session.b_cards,
+        session.challenger, session.target,
+        interaction.channel, interaction.client,
+    )
+    anim = discord.Embed(title="⚔️ Bắt đầu!", color=PVP_COLOR)
     anim.set_image(url=PVP_BATTLE_ANIM_GIF)
     anim_msg = await interaction.followup.send(embed=anim)
-    await asyncio.sleep(3.0)
+    await asyncio.sleep(2.5)
     try:
         await anim_msg.delete()
     except Exception:
         pass
 
-    await interaction.followup.send(
-        embed=_result_embed(session, result, ra, rb, na, nb, win_user, lose_user, draw)
+    battle.message = await interaction.followup.send(
+        embed=discord.Embed(title="⚔️ Đang vào trận...", color=PVP_COLOR)
     )
+    battle.build_order()
+    await _post_turn(battle)
+
+
+async def _post_turn(battle: BattleSession):
+    w = battle.check_winner()
+    if w is not False:
+        await _finish_battle(battle, w)
+        return
+    actor = battle.current_actor()
+    if actor is None:
+        await _finish_battle(battle, battle.check_winner())
+        return
+    embed = _battle_embed(battle, actor)
+    try:
+        await battle.message.edit(embed=embed, view=ActionView(battle, actor))
+    except Exception as e:
+        print("LỖI POST_TURN:", e, flush=True)
+
+
+async def _after_action(battle: BattleSession):
+    w = battle.check_winner()
+    if w is not False:
+        await _finish_battle(battle, w)
+        return
+    await _post_turn(battle)
+
+
+async def _finish_battle(battle: BattleSession, winner):
+    battle.done = True
+    ra_row = await get_pvp_rating(battle.a_user.id)
+    rb_row = await get_pvp_rating(battle.b_user.id)
+    ra = ra_row["rating"]
+    rb = rb_row["rating"]
+    if winner == "A":
+        na, nb = compute_elo(ra, rb)
+        win_user, lose_user = battle.a_user, battle.b_user
+        draw = False
+    elif winner == "B":
+        nb, na = compute_elo(rb, ra)
+        win_user, lose_user = battle.b_user, battle.a_user
+        draw = False
+    else:
+        na, nb = compute_elo_draw(ra, rb)
+        win_user, lose_user = None, None
+        draw = True
+    await update_pvp_result(battle.a_user.id, battle.b_user.id, na, nb, draw)
+
+    result = {
+        "winner": winner,
+        "log": battle.log,
+        "team_a": battle.team_a,
+        "team_b": battle.team_b,
+    }
+    embed = _result_embed(battle, result, ra, rb, na, nb, win_user, lose_user, draw)
+    try:
+        await battle.message.edit(embed=embed, view=None)
+    except Exception as e:
+        print("LỖI FINISH_BATTLE:", e, flush=True)
 
 
 # ====================== EMBEDS ======================
@@ -224,7 +305,53 @@ def _team_preview_embed(user, cards):
     return e
 
 
-def _result_embed(session, result, ra, rb, na, nb, win_user, lose_user, draw):
+def _battle_embed(battle: BattleSession, actor):
+    e = discord.Embed(title=f"⚔️ PvP — Round {battle.round}", color=PVP_COLOR)
+    e.set_author(name="Chị Cá 🐟 PvP")
+    e.add_field(
+        name=f"🔵 {battle.a_user.display_name}",
+        value=_team_battle_lines(battle.team_a),
+        inline=True,
+    )
+    e.add_field(
+        name=f"🔴 {battle.b_user.display_name}",
+        value=_team_battle_lines(battle.team_b),
+        inline=True,
+    )
+    if actor and actor.alive:
+        owner = battle._owner(actor)
+        e.add_field(
+            name="🎯 Lượt của",
+            value=f"{owner.mention}: **{actor.name}** {ROLE_LABEL[actor.role]} "
+                  f"⚡{actor.energy}/{PVP_ENERGY_MAX}",
+            inline=False,
+        )
+    else:
+        e.add_field(name="🎯 Lượt", value="—", inline=False)
+    log = battle.log[-10:]
+    e.add_field(
+        name="📜 Diễn biến",
+        value="```" + "\n".join(log) + "```" if log else "—",
+        inline=False,
+    )
+    return e
+
+
+def _team_battle_lines(team):
+    lines = []
+    for f in team:
+        if not f.alive:
+            lines.append(f"💀 {f.name}")
+            continue
+        lines.append(
+            f"{ELEMENT_EMOJI.get(f.element,'❔')} **{f.name}** [{ROLE_LABEL[f.role]}]\n"
+            f"{_bar(max(0,f.hp), f.max_hp)} {max(0,f.hp)}/{f.max_hp}\n"
+            f"⚡{f.energy}/{PVP_ENERGY_MAX}{' 🛡️' if f.shield > 0 else ''}"
+        )
+    return "\n".join(lines)
+
+
+def _result_embed(battle, result, ra, rb, na, nb, win_user, lose_user, draw):
     if draw:
         title = "🤝 HÒA!"
         color = 0x95A5A6
@@ -234,28 +361,22 @@ def _result_embed(session, result, ra, rb, na, nb, win_user, lose_user, draw):
     e = discord.Embed(title=title, color=color)
     e.set_author(name="Chị Cá 🐟 PvP")
 
-    a_name = session.challenger.display_name
-    b_name = session.target.display_name
-
     ta = result["team_a"]
     tb = result["team_b"]
 
     e.add_field(
-        name=f"🔵 Đội {a_name} (Rank {ra}→{na})",
+        name=f"🔵 Đội {battle.a_user.display_name} (Rank {ra}→{na})",
         value=_team_result_lines(ta),
         inline=True,
     )
     e.add_field(
-        name=f"🔴 Đội {b_name} (Rank {rb}→{nb})",
+        name=f"🔴 Đội {battle.b_user.display_name} (Rank {rb}→{nb})",
         value=_team_result_lines(tb),
         inline=True,
     )
 
     log = result["log"]
-    if len(log) > 18:
-        shown = log[:12] + ["...", "..."] + log[-4:]
-    else:
-        shown = log
+    shown = (log[:10] + ["...", "..."] + log[-4:]) if len(log) > 16 else log
     e.add_field(
         name="📜 Diễn biến",
         value="```" + "\n".join(shown) + "```" if shown else "—",
@@ -264,10 +385,9 @@ def _result_embed(session, result, ra, rb, na, nb, win_user, lose_user, draw):
 
     if not draw:
         delta_a = na - ra
-        delta_b = nb - rb
         e.set_footer(
-            text=f"{win_user.display_name} +{delta_a if delta_a>0 else delta_a} rank · "
-                 f"{lose_user.display_name} {delta_b} rank"
+            text=f"{win_user.display_name} {('+' if delta_a>=0 else '')}{delta_a} rank · "
+                 f"{lose_user.display_name} {nb-rb} rank"
         )
     else:
         e.set_footer(text="Hòa, không đổi rank")
@@ -331,7 +451,7 @@ async def start_pvp_challenge(message, bot):
     )
     e.set_author(name="Chị Cá 🐟 PvP")
     e.set_thumbnail(url=PVP_BATTLE_ANIM_GIF)
-    e.set_footer(text="Chọn 3 thẻ tự do · DPS gây dame · TANK giáp team · SUP buff/heal")
+    e.set_footer(text="Mỗi lượt: Đánh thường / Skill / Ultimate · tới lượt ai người đó bấm")
     await message.channel.send(embed=e, view=ChallengeView(session), reference=message)
 
 
@@ -347,7 +467,7 @@ async def handle_pvp_rank(message, bot):
             medals = {1: "🥇", 2: "🥈", 3: "🥉"}
             for i, r in enumerate(rows, 1):
                 uid = r["user_id"]
-                user = bot.get_user(uid) or message.guild.get_member(uid) if message.guild else None
+                user = bot.get_user(uid) or (message.guild.get_member(uid) if message.guild else None)
                 name = user.display_name if user else f"user {uid}"
                 e.add_field(
                     name=f"{medals.get(i, f'#{i}')} {name}",
@@ -359,9 +479,9 @@ async def handle_pvp_rank(message, bot):
 
     target = message.mentions[0] if message.mentions else message.author
     row = await get_pvp_rating(target.id)
-    rating = row["rating"] if row else START_RATING
-    wins = row["wins"] if row else 0
-    losses = row["losses"] if row else 0
+    rating = row["rating"]
+    wins = row["wins"]
+    losses = row["losses"]
     e = discord.Embed(title=f"⭐ Hạng PvP của {target.display_name}", color=PVP_COLOR)
     e.set_author(name="Chị Cá 🐟 PvP")
     e.set_thumbnail(url=target.display_avatar.url)
