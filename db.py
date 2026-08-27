@@ -46,11 +46,13 @@ async def _ensure_schema():
         for s in GACHA_SCHEMA_SQL:
             await conn.execute(s)
         await conn.execute(
-            "ALTER TABLE points ADD COLUMN IF NOT EXISTS max_level INTEGER NOT NULL DEFAULT 1"
+            "ALTER TABLE points DROP COLUMN IF EXISTS max_level"
         )
         await conn.execute(
-            "UPDATE points SET max_level = GREATEST(max_level, points / $1 + 1)",
-            POINTS_PER_LEVEL,
+            "ALTER TABLE points ADD COLUMN IF NOT EXISTS total_xp INTEGER NOT NULL DEFAULT 0"
+        )
+        await conn.execute(
+            "UPDATE points SET total_xp = GREATEST(total_xp, points)"
         )
     _schema_ready = True
 
@@ -83,14 +85,11 @@ async def add_points(user_id: int, n: int):
     try:
         await _ensure_schema()
         await db_pool.execute(
-            "INSERT INTO points(user_id, points, msgs, last) VALUES($1,$2,1,now()) "
+            "INSERT INTO points(user_id, points, total_xp, msgs, last) VALUES($1,$2,$2,1,now()) "
             "ON CONFLICT(user_id) DO UPDATE SET "
-            "points = points.points + $2, msgs = points.msgs + 1, last = now()",
+            "points = points.points + $2, total_xp = points.total_xp + $2, "
+            "msgs = points.msgs + 1, last = now()",
             user_id, n,
-        )
-        await db_pool.execute(
-            "UPDATE points SET max_level = GREATEST(max_level, points / $1 + 1) WHERE user_id=$2",
-            POINTS_PER_LEVEL, user_id,
         )
     except Exception as e:
         print(f"LỖI ADD_POINTS: {type(e).__name__}: {e}", flush=True)
@@ -108,8 +107,16 @@ async def get_level(user_id: int) -> int:
     if db_pool is None:
         return 1
     await _ensure_schema()
-    row = await db_pool.fetchrow("SELECT max_level FROM points WHERE user_id=$1", user_id)
-    return row["max_level"] if row else 1
+    row = await db_pool.fetchrow("SELECT total_xp FROM points WHERE user_id=$1", user_id)
+    return (row["total_xp"] // POINTS_PER_LEVEL) + 1 if row else 1
+
+
+async def get_xp(user_id: int) -> int:
+    if db_pool is None:
+        return 0
+    await _ensure_schema()
+    row = await db_pool.fetchrow("SELECT total_xp FROM points WHERE user_id=$1", user_id)
+    return row["total_xp"] if row else 0
 
 
 async def get_rank(user_id: int):

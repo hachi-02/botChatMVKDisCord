@@ -4,7 +4,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from config import POINT_COOLDOWN, POINTS_PER_MSG, POINTS_PER_LEVEL
-from db import add_points, get_points, get_rank, get_top, get_level
+from db import add_points, get_points, get_rank, get_top, get_level, get_xp
 
 cooldown = {}
 EMBED_COLOR = 0x1ABC9C
@@ -27,11 +27,14 @@ def _author(embed, bot):
 
 async def _award_and_notify(uid, author, channel, bot):
     old = await get_points(uid)
-    old_lvl = await get_level(uid)
+    old_xp = await get_xp(uid)
+    old_lvl = old_xp // POINTS_PER_LEVEL + 1
     await add_points(uid, POINTS_PER_MSG)
     new = await get_points(uid)
-    new_lvl = await get_level(uid)
+    xp = await get_xp(uid)
+    new_lvl = xp // POINTS_PER_LEVEL + 1
     if new_lvl > old_lvl:
+        prog = xp % POINTS_PER_LEVEL
         e = discord.Embed(
             title=f"🎉 {author.display_name} lên cấp {new_lvl}!",
             description=f"{author.mention} vừa đạt **{new}đ** 🐟",
@@ -41,7 +44,7 @@ async def _award_and_notify(uid, author, channel, bot):
         e.add_field(name="Cấp", value=f"**{new_lvl}**", inline=True)
         e.add_field(
             name="Tiến độ",
-            value=f"[{_bar(new % POINTS_PER_LEVEL)}] {new % POINTS_PER_LEVEL}/{POINTS_PER_LEVEL}đ",
+            value=f"[{_bar(prog)}] {prog}/{POINTS_PER_LEVEL}đ",
             inline=True,
         )
         await channel.send(embed=e)
@@ -95,8 +98,9 @@ async def handle_points(message, bot):
     target = message.mentions[0] if message.mentions else message.author
     pts = await get_points(target.id)
     rank = await get_rank(target.id)
-    lvl = await get_level(target.id)
-    prog = max(0, pts - (lvl - 1) * POINTS_PER_LEVEL)
+    xp = await get_xp(target.id)
+    lvl = xp // POINTS_PER_LEVEL + 1
+    prog = xp % POINTS_PER_LEVEL
     embed = discord.Embed(title=f"🐟 {target.display_name}", color=_rank_color(rank))
     _author(embed, bot)
     embed.set_thumbnail(url=target.display_avatar.url)
