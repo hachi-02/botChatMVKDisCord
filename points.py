@@ -24,7 +24,29 @@ def _author(embed, bot):
         embed.set_author(name="Chị Cá 🐟", icon_url=bot.user.display_avatar.url)
 
 
-async def maybe_award_points(message):
+async def _award_and_notify(uid, author, channel, bot):
+    old = await get_points(uid)
+    await add_points(uid, POINTS_PER_MSG)
+    new = await get_points(uid)
+    old_lvl = old // POINTS_PER_LEVEL + 1
+    new_lvl = new // POINTS_PER_LEVEL + 1
+    if new_lvl > old_lvl:
+        e = discord.Embed(
+            title=f"🎉 {author.display_name} lên cấp {new_lvl}!",
+            description=f"{author.mention} vừa đạt **{new}đ** 🐟",
+            color=0xFFD700,
+        )
+        _author(e, bot)
+        e.add_field(name="Cấp", value=f"**{new_lvl}**", inline=True)
+        e.add_field(
+            name="Tiến độ",
+            value=f"[{_bar(new)}] {new % POINTS_PER_LEVEL}/{POINTS_PER_LEVEL}đ",
+            inline=True,
+        )
+        await channel.send(embed=e)
+
+
+async def maybe_award_points(message, bot):
     if message.author.bot or not message.guild:
         return
     uid = message.author.id
@@ -33,7 +55,7 @@ async def maybe_award_points(message):
     if (last is None or (now - last).total_seconds() >= POINT_COOLDOWN) \
             and len(message.content.strip()) >= 5:
         cooldown[uid] = now
-        asyncio.create_task(add_points(uid, POINTS_PER_MSG))
+        asyncio.create_task(_award_and_notify(uid, message.author, message.channel, bot))
 
 
 async def handle_points(message, bot):

@@ -440,7 +440,7 @@ async def on_message(message):
     if message.guild is None:
         return
 
-    await maybe_award_points(message)
+    await maybe_award_points(message, bot)
 
     bot_mentioned = bot.user in message.mentions
 
