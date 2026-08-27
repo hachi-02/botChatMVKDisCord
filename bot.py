@@ -83,7 +83,8 @@ def _event_help_embed(bot):
 def _menu_embed(bot):
     e = discord.Embed(title="Menu Chị Cá", color=EMBED_COLOR)
     if bot.user:
-        e.set_author(name="Chị Cá", icon_url=LEVELUP_GIF)
+        e.set_author(name="Chị Cá", icon_url=bot.user.display_avatar.url)
+    e.set_thumbnail(url=LEVELUP_GIF)
     items = [
         ("💬 Nói chuyện", "Gọi `chị cá` hoặc tag chị"),
         ("🔍 Tìm web", "`chị cá` + \"tìm\", \"là ai\", \"khi nào\"..."),
