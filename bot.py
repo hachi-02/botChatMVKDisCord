@@ -22,6 +22,9 @@ from config import (
     EVENT_KEYWORDS,
     EVENT_HELP_KEYWORDS,
     INVITE_KEYWORDS,
+    SUMMARY_KEYWORDS,
+    SUMMARY_LIMIT,
+    SUMMARY_MAX,
     HELP_KEYWORDS,
     EVENT_REMIND_MINUTES,
     EVENT_DEFAULT_DURATION_MINUTES,
@@ -65,6 +68,7 @@ HELP_TEXT = (
     "⏰ Nhắc: `chị cá` + `nhắc em 7h học bài`\n"
     "📅 Tạo sự kiện: `chị cá tạo sự kiện` + `Tên | thời gian | mô tả | địa điểm`\n"
     "🔗 Lời mời: `chị cá` + `tạo link mời`\n"
+    "🔎 Tóm tắt: `chị cá` + `tóm tắt 1 tiếng` / `tóm tắt 30 tin`\n"
     "Gõ `chị cá menu` để xem lại nhé!"
 )
 
@@ -530,6 +534,88 @@ async def on_message(message):
                 reference=message,
             )
             return
+
+    is_summary = addressed and any(kw in content_lower for kw in SUMMARY_KEYWORDS)
+    if is_summary:
+        raw = re.sub(r"^(chị\s*cá|chica)\s*", "", message.content, flags=re.I).strip()
+        raw = raw.replace("tóm tắt", "", 1).strip()
+
+        now = datetime.now(ZoneInfo("Asia/Ho_Chi_Minh"))
+        after = None
+        limit = SUMMARY_LIMIT
+
+        m_time = re.search(
+            r"(\d+)\s*(phút|tiếng|giờ|ngày|phut|gio|ngay|p|h|hour|day|minute|minutes|min)",
+            raw,
+            re.I,
+        )
+        if m_time:
+            n = int(m_time.group(1))
+            u = m_time.group(2).lower()
+            if u in ("phút", "phut", "minute", "minutes", "min", "p"):
+                delta = timedelta(minutes=n)
+            elif u in ("tiếng", "giờ", "gio", "hour", "h"):
+                delta = timedelta(hours=n)
+            else:
+                delta = timedelta(days=n)
+            after = now - delta
+        else:
+            m_count = re.search(r"(\d+)\s*(tin|tin nhắn|messages?)?", raw, re.I)
+            if m_count:
+                limit = min(int(m_count.group(1)), SUMMARY_MAX)
+
+        if after:
+            msgs = [
+                m
+                async for m in message.channel.history(
+                    after=after, before=message, limit=SUMMARY_MAX
+                )
+            ]
+        else:
+            msgs = [
+                m
+                async for m in message.channel.history(
+                    limit=limit, before=message
+                )
+            ]
+
+        msgs.reverse()
+        transcript = "\n".join(
+            f"{m.author.display_name}: {m.content}" for m in msgs if m.content
+        )
+        if not transcript.strip():
+            await message.channel.send(
+                "Chị không có gì để tóm tắt hết 🐟", reference=message
+            )
+            return
+
+        system = (
+            get_system_prompt(sender_name, get_known_users())
+            + "\n\nNHIỆM VỤ THÊM: tóm tắt cuộc hội thoại được cung cấp ở dưới "
+            "bằng tiếng Việt, ngắn gọn, đủ ý chính, tuyệt đối không bịa thêm. "
+            "Nếu không có nội dung, chỉ trả lời 'không có gì để tóm tắt'."
+        )
+        try:
+            async with message.channel.typing():
+                response = await asyncio.to_thread(
+                    ai.chat.completions.create,
+                    model=MODEL_NAME,
+                    max_tokens=1024,
+                    messages=[
+                        {"role": "system", "content": system},
+                        {"role": "user", "content": transcript},
+                    ],
+                )
+            summary = clean_ai_response(response.choices[0].message.content or "")
+            if len(summary) > 2000:
+                summary = summary[:1997] + "..."
+            await message.channel.send(summary, reference=message)
+        except Exception as e:
+            print(f"LỖI SUMMARY: {type(e).__name__}: {e}", flush=True)
+            await message.channel.send(
+                "Chị tóm tắt hơi trục trặc rồi 😭", reference=message
+            )
+        return
 
     if not bot_mentioned and not role_mentioned:
         if not any(kw in content_lower for kw in KEYWORDS):

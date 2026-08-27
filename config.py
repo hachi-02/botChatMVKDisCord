@@ -61,6 +61,9 @@ REMIND_KEYWORDS = ["nhắc t", "remind", "nhắc tôi", "nhắc em"]
 
 EVENT_KEYWORDS = ["tạo sự kiện", "tạo event", "lên lịch", "event", "schedule"]
 INVITE_KEYWORDS = ["lời mời", "link mời"]
+SUMMARY_KEYWORDS = ["tóm tắt"]
+SUMMARY_LIMIT = 50
+SUMMARY_MAX = 500
 HELP_KEYWORDS = ["menu", "help"]
 EVENT_HELP_KEYWORDS = [
     "như nào", "cách", "hướng dẫn", "làm sao", "như thế nào",
