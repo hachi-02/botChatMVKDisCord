@@ -5,7 +5,7 @@ import random
 
 import aiohttp
 import discord
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageSequence
 
 from db import (
     get_points,
@@ -36,6 +36,10 @@ def _thumb(url, w=400):
     return url.replace("/upload/", f"/upload/w_{w}/", 1)
 
 
+def _anim(url, w=230):
+    return url.replace("/upload/", f"/upload/f_gif,w_{w}/", 1)
+
+
 async def _fetch_image(session, url):
     async with session.get(url) as resp:
         resp.raise_for_status()
@@ -59,6 +63,10 @@ def _stars(rarity):
     return "★★★★★" if rarity in ("5L", "5S") else "★★★★"
 
 
+MAX_FRAMES = 20
+GIF_FRAME_MS = 80
+
+
 async def _build_montage(results, is_new_list):
     font_path = _font_path()
     name_font = ImageFont.truetype(font_path, 26) if font_path else ImageFont.load_default()
@@ -68,28 +76,50 @@ async def _build_montage(results, is_new_list):
     img_h = 320
     gap = 12
     pad = 14
-    bg = (43, 45, 49, 255)
+    bg = (43, 45, 49)
     n = len(results)
     total_w = pad * 2 + n * cell_w + (n - 1) * gap
     total_h = pad * 2 + img_h + 78
 
-    canvas = Image.new("RGBA", (total_w, total_h), bg)
-    draw = ImageDraw.Draw(canvas)
-
+    cell_frames = []
     async with aiohttp.ClientSession() as s:
-        for i, (r, is_new) in enumerate(zip(results, is_new_list)):
-            x0 = pad + i * (cell_w + gap)
-            y0 = pad
+        for r in results:
             try:
-                data = await _fetch_image(s, _thumb(r["url"], 400))
-                im = Image.open(io.BytesIO(data)).convert("RGBA")
+                data = await _fetch_image(s, _anim(r["url"], cell_w))
+                im = Image.open(io.BytesIO(data))
             except Exception as e:
                 print(f"LỖI FETCH IMG: {type(e).__name__}: {e}", flush=True)
                 im = Image.new("RGBA", (cell_w, img_h), (60, 63, 68, 255))
-            im.thumbnail((cell_w, img_h), Image.Resampling.LANCZOS)
-            ix = x0 + (cell_w - im.width) // 2
-            iy = y0 + (img_h - im.height) // 2
-            canvas.alpha_composite(im, (ix, iy))
+            frames = []
+            try:
+                for fr in ImageSequence.Iterator(im):
+                    f = fr.convert("RGBA").copy()
+                    f.thumbnail((cell_w, img_h), Image.Resampling.LANCZOS)
+                    frames.append(f)
+            except Exception:
+                f = im.convert("RGBA").copy()
+                f.thumbnail((cell_w, img_h), Image.Resampling.LANCZOS)
+                frames = [f]
+            if not frames:
+                frames = [Image.new("RGBA", (cell_w, img_h), (60, 63, 68, 255))]
+            if len(frames) > MAX_FRAMES:
+                step = len(frames) / MAX_FRAMES
+                frames = [frames[int(i * step)] for i in range(MAX_FRAMES)]
+            cell_frames.append(frames)
+
+    max_frames = max(len(f) for f in cell_frames)
+
+    out_frames = []
+    for t in range(max_frames):
+        canvas = Image.new("RGB", (total_w, total_h), bg)
+        draw = ImageDraw.Draw(canvas)
+        for i, (r, is_new) in enumerate(zip(results, is_new_list)):
+            x0 = pad + i * (cell_w + gap)
+            y0 = pad
+            fr = cell_frames[i][t % len(cell_frames[i])]
+            ix = x0 + (cell_w - fr.width) // 2
+            iy = y0 + (img_h - fr.height) // 2
+            canvas.paste(fr, (ix, iy), fr)
 
             rarity_color = (255, 215, 0) if r["rarity"] in ("5L", "5S") else (155, 89, 182)
             name_y = y0 + img_h + 10
@@ -98,11 +128,20 @@ async def _build_montage(results, is_new_list):
             draw.text((x0 + cell_w // 2, star_y), _stars(r["rarity"]), font=star_font, fill=(255, 215, 0), anchor="mm")
             if is_new:
                 draw.text((x0 + cell_w // 2, star_y + 30), "MỚI!", font=star_font, fill=(46, 204, 113), anchor="mm")
+        out_frames.append(canvas)
 
     buf = io.BytesIO()
-    canvas.convert("RGB").save(buf, format="PNG")
+    out_frames[0].save(
+        buf,
+        format="GIF",
+        save_all=True,
+        append_images=out_frames[1:],
+        duration=GIF_FRAME_MS,
+        loop=0,
+        disposal=2,
+    )
     buf.seek(0)
-    return discord.File(buf, filename="gacha_result.png")
+    return discord.File(buf, filename="gacha_result.gif")
 
 
 def roll_one(state):
