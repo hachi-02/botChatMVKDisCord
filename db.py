@@ -1,19 +1,17 @@
-import os
 from urllib.parse import urlparse, urlunparse, parse_qsl, urlencode
 
 from config import DATABASE_URL
 
 db_pool = None
-_mem = {}  # fallback in-memory khi chưa cấu hình DATABASE_URL
 _schema_ready = False
+_no_db_warned = False
 
 SCHEMA_SQL = (
     "CREATE TABLE IF NOT EXISTS points ("
     " user_id BIGINT PRIMARY KEY,"
     " points  INTEGER NOT NULL DEFAULT 0,"
     " msgs    INTEGER NOT NULL DEFAULT 0,"
-    " last    TIMESTAMP"
-    ");"
+    " last    TIMESTAMP);"
 )
 
 
@@ -36,14 +34,12 @@ async def _ensure_schema():
 async def init_db():
     global db_pool
     if not DATABASE_URL:
-        print("DATABASE_URL chưa cấu hình - dùng in-memory cho points.", flush=True)
+        print("DATABASE_URL chưa cấu hình - points sẽ KHÔNG được lưu (không có RAM fallback).", flush=True)
         return
     import asyncpg
 
     dsn = _clean_dsn(DATABASE_URL)
-    pool = await asyncpg.create_pool(
-        dsn, min_size=1, max_size=5, statement_cache_size=0
-    )
+    pool = await asyncpg.create_pool(dsn, min_size=1, max_size=5, statement_cache_size=0)
     async with pool.acquire() as conn:
         await conn.execute(SCHEMA_SQL)
     db_pool = pool
@@ -52,8 +48,11 @@ async def init_db():
 
 
 async def add_points(user_id: int, n: int):
+    global _no_db_warned
     if db_pool is None:
-        _mem[user_id] = _mem.get(user_id, 0) + n
+        if not _no_db_warned:
+            print("WARN: db_pool is None - bỏ qua ghi điểm (chưa kết nối DB, không có RAM fallback).", flush=True)
+            _no_db_warned = True
         return
     try:
         await _ensure_schema()
@@ -64,13 +63,12 @@ async def add_points(user_id: int, n: int):
             user_id, n,
         )
     except Exception as e:
-        print(f"LỖI ADD_POINTS (fallback ram): {type(e).__name__}: {e}", flush=True)
-        _mem[user_id] = _mem.get(user_id, 0) + n
+        print(f"LỖI ADD_POINTS: {type(e).__name__}: {e}", flush=True)
 
 
 async def get_points(user_id: int) -> int:
     if db_pool is None:
-        return _mem.get(user_id, 0)
+        return 0
     await _ensure_schema()
     row = await db_pool.fetchrow("SELECT points FROM points WHERE user_id=$1", user_id)
     return row["points"] if row else 0
@@ -89,8 +87,7 @@ async def get_rank(user_id: int):
 
 async def get_top(limit: int = 10):
     if db_pool is None:
-        items = sorted(_mem.items(), key=lambda x: -x[1])[:limit]
-        return [{"user_id": uid, "points": pts} for uid, pts in items]
+        return []
     await _ensure_schema()
     return await db_pool.fetch(
         "SELECT user_id, points FROM points ORDER BY points DESC LIMIT $1", limit
