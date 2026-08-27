@@ -41,7 +41,7 @@ async def _award_and_notify(uid, author, channel, bot):
         e.add_field(name="Cấp", value=f"**{new_lvl}**", inline=True)
         e.add_field(
             name="Tiến độ",
-            value=f"[{_bar(new)}] {new % POINTS_PER_LEVEL}/{POINTS_PER_LEVEL}đ",
+            value=f"[{_bar(new % POINTS_PER_LEVEL)}] {new % POINTS_PER_LEVEL}/{POINTS_PER_LEVEL}đ",
             inline=True,
         )
         await channel.send(embed=e)
