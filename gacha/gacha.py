@@ -1,5 +1,6 @@
 import asyncio
 import io
+import math
 import os
 import random
 
@@ -59,75 +60,129 @@ def _font_path():
     return None
 
 
-def _stars(rarity):
-    return "★★★★★" if rarity in ("5L", "5S") else "★★★★"
+IMG_CACHE = {}
+IMG_CACHE_MAX = 64
 
 
-MAX_FRAMES = 20
+def _rarity_color(rarity):
+    return (255, 215, 0) if rarity in ("5L", "5S") else (155, 89, 182)
+
+
+def _star_points(cx, cy, r, n=5):
+    pts = []
+    for i in range(n * 2):
+        ang = -math.pi / 2 + i * math.pi / n
+        rad = r if i % 2 == 0 else r * 0.45
+        pts.append((cx + rad * math.cos(ang), cy + rad * math.sin(ang)))
+    return pts
+
+
+def _draw_stars_row(draw, cx, cy, count, r, color):
+    if count <= 0:
+        return
+    spacing = r * 2.4
+    total = spacing * (count - 1)
+    x = cx - total / 2
+    for k in range(count):
+        draw.polygon(_star_points(x + k * spacing, cy, r), fill=color)
+
+
+def _vgradient(w, h, top, bottom):
+    base = Image.new("RGB", (w, h), top)
+    d = ImageDraw.Draw(base)
+    for y in range(h):
+        t = y / max(1, h - 1)
+        col = tuple(int(top[i] + (bottom[i] - top[i]) * t) for i in range(3))
+        d.line([(0, y), (w, y)], fill=col)
+    return base
+
+
+MAX_FRAMES = 16
 GIF_FRAME_MS = 80
+
+
+async def _get_img(session, r, w):
+    key = r["key"]
+    if key in IMG_CACHE:
+        return key, IMG_CACHE[key]
+    data = await _fetch_image(session, _anim(r["url"], w))
+    if len(IMG_CACHE) < IMG_CACHE_MAX:
+        IMG_CACHE[key] = data
+    return key, data
 
 
 async def _build_montage(results, is_new_list):
     font_path = _font_path()
     name_font = ImageFont.truetype(font_path, 26) if font_path else ImageFont.load_default()
-    star_font = ImageFont.truetype(font_path, 22) if font_path else ImageFont.load_default()
+    tag_font = ImageFont.truetype(font_path, 20) if font_path else ImageFont.load_default()
 
     cell_w = 230
     img_h = 320
-    gap = 12
-    pad = 14
-    bg = (43, 45, 49)
+    gap = 14
+    pad = 16
+    radius = 16
     n = len(results)
     total_w = pad * 2 + n * cell_w + (n - 1) * gap
-    total_h = pad * 2 + img_h + 78
+    total_h = pad * 2 + img_h + 86
+
+    async with aiohttp.ClientSession() as s:
+        fetched = await asyncio.gather(*[_get_img(s, r, cell_w) for r in results])
+    img_data = {k: d for k, d in fetched}
 
     cell_frames = []
-    async with aiohttp.ClientSession() as s:
-        for r in results:
-            try:
-                data = await _fetch_image(s, _anim(r["url"], cell_w))
-                im = Image.open(io.BytesIO(data))
-            except Exception as e:
-                print(f"LỖI FETCH IMG: {type(e).__name__}: {e}", flush=True)
-                im = Image.new("RGBA", (cell_w, img_h), (60, 63, 68, 255))
-            frames = []
-            try:
-                for fr in ImageSequence.Iterator(im):
-                    f = fr.convert("RGBA").copy()
-                    f.thumbnail((cell_w, img_h), Image.Resampling.LANCZOS)
-                    frames.append(f)
-            except Exception:
-                f = im.convert("RGBA").copy()
+    for r in results:
+        data = img_data[r["key"]]
+        try:
+            im = Image.open(io.BytesIO(data))
+        except Exception as e:
+            print(f"LỖI OPEN IMG: {type(e).__name__}: {e}", flush=True)
+            im = Image.new("RGBA", (cell_w, img_h), (60, 63, 68, 255))
+        frames = []
+        try:
+            for fr in ImageSequence.Iterator(im):
+                f = fr.convert("RGBA").copy()
                 f.thumbnail((cell_w, img_h), Image.Resampling.LANCZOS)
-                frames = [f]
-            if not frames:
-                frames = [Image.new("RGBA", (cell_w, img_h), (60, 63, 68, 255))]
-            if len(frames) > MAX_FRAMES:
-                step = len(frames) / MAX_FRAMES
-                frames = [frames[int(i * step)] for i in range(MAX_FRAMES)]
-            cell_frames.append(frames)
+                frames.append(f)
+        except Exception:
+            f = im.convert("RGBA").copy()
+            f.thumbnail((cell_w, img_h), Image.Resampling.LANCZOS)
+            frames = [f]
+        if not frames:
+            frames = [Image.new("RGBA", (cell_w, img_h), (60, 63, 68, 255))]
+        if len(frames) > MAX_FRAMES:
+            step = len(frames) / MAX_FRAMES
+            frames = [frames[int(i * step)] for i in range(MAX_FRAMES)]
+        cell_frames.append(frames)
 
     max_frames = max(len(f) for f in cell_frames)
 
     out_frames = []
     for t in range(max_frames):
-        canvas = Image.new("RGB", (total_w, total_h), bg)
+        canvas = _vgradient(total_w, total_h, (28, 30, 35), (43, 45, 49))
         draw = ImageDraw.Draw(canvas)
         for i, (r, is_new) in enumerate(zip(results, is_new_list)):
             x0 = pad + i * (cell_w + gap)
             y0 = pad
+            rarity_color = _rarity_color(r["rarity"])
+            draw.rounded_rectangle(
+                [x0, y0, x0 + cell_w, y0 + img_h],
+                radius=radius,
+                fill=(47, 49, 54),
+                outline=rarity_color,
+                width=3,
+            )
             fr = cell_frames[i][t % len(cell_frames[i])]
             ix = x0 + (cell_w - fr.width) // 2
             iy = y0 + (img_h - fr.height) // 2
             canvas.paste(fr, (ix, iy), fr)
 
-            rarity_color = (255, 215, 0) if r["rarity"] in ("5L", "5S") else (155, 89, 182)
-            name_y = y0 + img_h + 10
+            name_y = y0 + img_h + 14
             draw.text((x0 + cell_w // 2, name_y), r["name"], font=name_font, fill=rarity_color, anchor="mm")
             star_y = name_y + 32
-            draw.text((x0 + cell_w // 2, star_y), _stars(r["rarity"]), font=star_font, fill=(255, 215, 0), anchor="mm")
+            n_stars = 5 if r["rarity"] in ("5L", "5S") else 4
+            _draw_stars_row(draw, x0 + cell_w // 2, star_y, n_stars, 11, (255, 215, 0))
             if is_new:
-                draw.text((x0 + cell_w // 2, star_y + 30), "MỚI!", font=star_font, fill=(46, 204, 113), anchor="mm")
+                draw.text((x0 + cell_w // 2, star_y + 26), "MỚI!", font=tag_font, fill=(46, 204, 113), anchor="mm")
         out_frames.append(canvas)
 
     buf = io.BytesIO()
@@ -201,14 +256,16 @@ async def handle_gacha(channel, author, bot, n):
     roll = discord.Embed(title="🎰 Đang quay...", color=EMBED_COLOR)
     roll.set_image(url=GACHA_ROLL_GIF)
     msg = await channel.send(embed=roll)
-    await asyncio.sleep(2.5)
+
+    task = asyncio.create_task(_build_montage(results, is_new_list))
+    await asyncio.sleep(2.0)
     try:
         await msg.delete()
     except Exception:
         pass
 
     try:
-        file = await _build_montage(results, is_new_list)
+        file = await task
         await channel.send(content=f"🎴 Kết quả quay **{n} lần** của {author.mention}:", file=file)
     except Exception as e:
         print(f"LỖI MONTAGE: {type(e).__name__}: {e}", flush=True)
