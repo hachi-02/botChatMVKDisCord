@@ -40,7 +40,7 @@ from memory import add_message, get_history, remember_user, get_known_users
 from search import search_web
 from web_server import start_web_server
 from db import init_db
-from points import maybe_award_points, handle_points
+from points import maybe_award_points, handle_points, EMBED_COLOR
 
 intents = discord.Intents.default()
 intents.members = True
@@ -54,31 +54,51 @@ event_queue = []
 
 NUMBER_EMOJIS = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"]
 
-EVENT_HELP_TEXT = (
-    "📌 **Cách tạo sự kiện:**\n"
-    "`chị cá tạo sự kiện Tên | thời gian | mô tả | địa điểm`\n"
-    "• **Tên** và **thời gian** là bắt buộc.\n"
-    "• **Mô tả** và **địa điểm** không bắt buộc.\n"
-    "• Địa điểm trùng tên voice channel → tạo sự kiện trong kênh đó, "
-    "không thì là sự kiện ngoài (`Online` mặc định).\n"
-    "**Ví dụ:**\n"
-    "• `chị cá tạo sự kiện Sinh nhật | ngày mai 20h | mang bánh | voice chung`\n"
-    "• `chị cá event Offline | 25/12 19h30` 🐟"
-)
+def _event_help_embed(bot):
+    e = discord.Embed(title="📌 Tạo sự kiện", color=EMBED_COLOR)
+    if bot.user:
+        e.set_author(name="Chị Cá 🐟", icon_url=bot.user.display_avatar.url)
+    e.add_field(
+        name="Cú pháp",
+        value="`chị cá tạo sự kiện Tên | thời gian | mô tả | địa điểm`",
+        inline=False,
+    )
+    e.add_field(name="Bắt buộc", value="**Tên** và **thời gian**", inline=True)
+    e.add_field(name="Tuỳ chọn", value="**Mô tả** và **địa điểm**", inline=True)
+    e.add_field(
+        name="Ghi chú",
+        value="Địa điểm trùng tên voice channel → tạo sự kiện trong kênh đó, "
+              "không thì là sự kiện ngoài (`Online` mặc định).",
+        inline=False,
+    )
+    e.add_field(
+        name="Ví dụ",
+        value="• `chị cá tạo sự kiện Sinh nhật | ngày mai 20h | mang bánh | voice chung`\n"
+              "• `chị cá event Offline | 25/12 19h30` 🐟",
+        inline=False,
+    )
+    return e
 
-HELP_TEXT = (
-    "🐟 Chị Cá đây, chị giúp em được:\n"
-    "💬 Nói chuyện: gọi `chị cá` hoặc tag chị\n"
-    "🔍 Tìm web: `chị cá` + hỏi kèm \"tìm\", \"là ai\", \"khi nào\"...\n"
-    "👥 Xem thành viên online: `chị cá` + \"ai đang online\"\n"
-    "📊 Vote: `chị cá` + `vote pizza | phở | cơm`\n"
-    "⏰ Nhắc: `chị cá` + `nhắc em 7h học bài`\n"
-    "📅 Tạo sự kiện: `chị cá tạo sự kiện` + `Tên | thời gian | mô tả | địa điểm`\n"
-    "🔗 Lời mời: `chị cá` + `tạo link mời`\n"
-    "🔎 Tóm tắt: `chị cá` + `tóm tắt 1 tiếng` / `tóm tắt 30 tin`\n"
-    "🏆 Điểm: `chị cá` + `điểm` / `chị cá top`\n"
-    "Gõ `chị cá menu` để xem lại nhé!"
-)
+
+def _menu_embed(bot):
+    e = discord.Embed(title="🐟 Menu Chị Cá", color=EMBED_COLOR)
+    if bot.user:
+        e.set_author(name="Chị Cá 🐟", icon_url=bot.user.display_avatar.url)
+    items = [
+        ("💬 Nói chuyện", "Gọi `chị cá` hoặc tag chị"),
+        ("🔍 Tìm web", "`chị cá` + \"tìm\", \"là ai\", \"khi nào\"..."),
+        ("👥 Thành viên online", "`chị cá` + \"ai đang online\""),
+        ("📊 Vote", "`chị cá` + `vote pizza | phở | cơm`"),
+        ("⏰ Nhắc", "`chị cá` + `nhắc em 7h học bài`"),
+        ("📅 Sự kiện", "`chị cá tạo sự kiện` + `Tên | thời gian | mô tả | địa điểm`"),
+        ("🔗 Lời mời", "`chị cá` + `tạo link mời`"),
+        ("🔎 Tóm tắt", "`chị cá` + `tóm tắt 1 tiếng` / `tóm tắt 30 tin`"),
+        ("🏆 Điểm", "`chị cá` + `điểm` / `chị cá top`"),
+    ]
+    for name, val in items:
+        e.add_field(name=name, value=val, inline=True)
+    e.set_footer(text="Gõ chị cá menu để xem lại nhé!")
+    return e
 
 
 SUMMARY_SYSTEM_PROMPT = (
@@ -264,7 +284,7 @@ async def handle_event_creation(message) -> bool:
     is_help = any(kw in content_lower for kw in EVENT_HELP_KEYWORDS)
 
     if is_help or not raw:
-        await message.channel.send(EVENT_HELP_TEXT, reference=message)
+        await message.channel.send(embed=_event_help_embed(bot), reference=message)
         return True
 
     if "|" not in raw:
@@ -273,7 +293,7 @@ async def handle_event_creation(message) -> bool:
     parts = [p.strip() for p in raw.split("|") if p.strip()]
 
     if len(parts) < 2:
-        await message.channel.send(EVENT_HELP_TEXT, reference=message)
+        await message.channel.send(embed=_event_help_embed(bot), reference=message)
         return True
 
     name = parts[0]
@@ -418,7 +438,7 @@ async def on_message(message):
         kw in content_lower for kw in HELP_KEYWORDS
     )
     if is_general_help:
-        await message.channel.send(HELP_TEXT, reference=message)
+        await message.channel.send(embed=_menu_embed(bot), reference=message)
         return
 
     is_event = addressed and any(kw in content_lower for kw in EVENT_KEYWORDS)
