@@ -67,7 +67,7 @@ async def handle_points(message, bot):
         embed = discord.Embed(title="🏆 Top 10 Chị Cá", color=EMBED_COLOR)
         _author(embed, bot)
         if not rows:
-            embed.description = "Hãy chat (tin nhắn ≥ 5 ký tự) để nhận điểm nhé! Mỗi tin ~30s được +1đ."
+            embed.description = "Hãy chat (tin nhắn ≥ 5 ký tự) để nhận điểm nhé! Mỗi tin ~30s được +10đ."
             embed.set_footer(text="Chưa có ai tích điểm • Tích điểm mỗi tin nhắn")
             await message.channel.send(embed=embed, reference=message)
             return
@@ -108,5 +108,5 @@ async def handle_points(message, bot):
         inline=False,
     )
     icon = message.guild.icon.url if (message.guild and message.guild.icon) else discord.Embed.Empty
-    embed.set_footer(text="Tích điểm mỗi tin nhắn • +1đ / 30s", icon_url=icon)
+    embed.set_footer(text="Tích điểm mỗi tin nhắn • +10đ / 30s", icon_url=icon)
     await message.channel.send(embed=embed, reference=message)

@@ -83,7 +83,7 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 
 POINT_KEYWORDS = ["điểm", "rank", "xếp hạng", "leaderboard", "top"]
 POINT_COOLDOWN = 30
-POINTS_PER_MSG = 1
+POINTS_PER_MSG = 10
 POINTS_PER_LEVEL = 100
 
 GACHA_KEYWORDS = ["gacha", "quay", "roll"]

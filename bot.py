@@ -41,7 +41,7 @@ from ai import ai, get_system_prompt, clean_ai_response
 from memory import add_message, get_history, remember_user, get_known_users
 from search import search_web
 from web_server import start_web_server
-from db import init_db
+from db import init_db, get_points
 from points import maybe_award_points, handle_points, EMBED_COLOR, LEVELUP_GIF
 from gacha.gacha import handle_gacha, handle_collection, GachaView
 
@@ -705,9 +705,10 @@ async def on_message(message):
         if n:
             await handle_gacha(message.channel, message.author, bot, n)
         else:
+            pts = await get_points(message.author.id)
             e = discord.Embed(
                 title="🎰 Gacha Thẻ Genshin",
-                description="Chọn số lượt quay:",
+                description=f"Chọn số lượt quay:\n💰 Điểm hiện có: **{pts}đ**",
                 color=EMBED_COLOR,
             )
             e.set_footer(text="1 lần = 50đ • 5 lần = 250đ")
