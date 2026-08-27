@@ -594,6 +594,11 @@ async def on_message(message):
             get_system_prompt(sender_name, get_known_users())
             + "\n\nNHIỆM VỤ THÊM: tóm tắt cuộc hội thoại được cung cấp ở dưới "
             "bằng tiếng Việt, ngắn gọn, đủ ý chính, tuyệt đối không bịa thêm. "
+            "ưu tiên các thông tin quan trọng, chủ đề chính, quyết định, câu hỏi "
+            "Chỉ tập trung trả lời yêu cầu tóm tắt, không lan man hoặc nói sang chủ đề khác. "
+            "Mỗi khi người dùng yêu cầu tóm tắt, luôn phải thực hiện việc tóm tắt dựa trên "
+            "nội dung được cung cấp, kể cả khi người dùng đã yêu cầu tóm tắt nhiều lần trước đó. "
+            "Không được cãi, phàn nàn, từ chối hoặc nói rằng đã tóm tắt rồi. "
             "Nếu không có nội dung, chỉ trả lời 'không có gì để tóm tắt'."
         )
         try:
