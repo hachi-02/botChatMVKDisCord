@@ -126,22 +126,29 @@ async def handle_gacha(channel, author, bot, n):
 async def handle_collection(channel, author, bot):
     uid = author.id
     rows = await get_collection(uid)
-    if not rows:
-        await channel.send(
-            f"{author.mention} em chưa có thẻ nào. Quay thử `chị cá gacha` đi! 🎴"
-        )
-        return
-    groups = {"5L": [], "5S": [], "4": []}
-    for c in rows:
-        groups.setdefault(c["rarity"], []).append(c)
-    lines = []
-    for rar in ("5L", "5S", "4"):
-        for c in groups[rar]:
-            lines.append(f"{RARITY_LABEL[rar]}: **{NAME_BY_KEY.get(c['char_key'], c['char_key'])}** x{c['dup_count']}")
-    e = discord.Embed(title=f"🎴 Bộ sưu tập của {author.display_name}", color=EMBED_COLOR)
-    e.description = "\n".join(lines) if lines else "Trống"
-    total_cards = sum(c["dup_count"] for c in rows)
-    e.set_footer(text=f"Tổng {len(rows)} loại • {total_cards} thẻ (tính cả dup)")
+    owned = {r["char_key"]: r["dup_count"] for r in rows}
+    five = []
+    four = []
+    locked = []
+    for c in CHARACTER_POOL:
+        key = c["key"]
+        if key in owned:
+            line = f"{c['name']} x{owned[key]}"
+            (five if c["rarity"].startswith("5") else four).append(line)
+        else:
+            locked.append(f"{c['name']} x0")
+    parts = []
+    if five:
+        parts.append("```fix\n" + "\n".join(five) + "\n```")
+    if four:
+        parts.append("```ini\n" + "\n".join(f"[{x}]" for x in four) + "\n```")
+    if locked:
+        parts.append("```cs\n" + "\n".join(f"// {x}" for x in locked) + "\n```")
+    desc = "\n".join(parts) if parts else "Chưa có thẻ nào."
+    total = sum(owned.values())
+    e = discord.Embed(title=f"🎴 Kho thẻ của {author.display_name}", color=EMBED_COLOR)
+    e.description = desc
+    e.set_footer(text=f"Đã có {len(owned)}/22 • {total} thẻ")
     await channel.send(embed=e)
 
 
