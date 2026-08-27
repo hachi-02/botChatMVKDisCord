@@ -117,6 +117,26 @@ SUMMARY_SYSTEM_PROMPT = (
 )
 
 
+def _member_list_embed(message, bot):
+    guild = message.guild
+    members = guild.members
+    online = [m for m in members if m.status != discord.Status.offline]
+    total, online_count = len(members), len(online)
+    e = discord.Embed(title="👥 Thành viên online", color=EMBED_COLOR)
+    if bot.user:
+        e.set_author(name="Chị Cá 🐟", icon_url=bot.user.display_avatar.url)
+    if guild.icon:
+        e.set_thumbnail(url=guild.icon.url)
+    e.description = f"**{online_count}/{total}** thành viên đang online"
+    for m in online[:20]:
+        role = m.top_role.name if m.top_role.name != "@everyone" else ""
+        status = "🟢" if m.status == discord.Status.online else "🟡"
+        e.add_field(name=f"{status} {m.display_name}", value=role or "—", inline=True)
+    footer = (f"...và {online_count - 20} người nữa • " if online_count > 20 else "") + guild.name
+    e.set_footer(text=footer, icon_url=guild.icon.url if guild.icon else discord.Embed.Empty)
+    return e
+
+
 def parse_remind_time(text: str):
     text = text.lower().strip()
     now = datetime.now(ZoneInfo("Asia/Ho_Chi_Minh"))
@@ -472,26 +492,7 @@ async def on_message(message):
     if addressed:
         is_member_list = any(kw in content_lower for kw in MEMBER_KEYWORDS)
         if is_member_list and message.guild:
-            members = message.guild.members
-            online = [m for m in members if m.status != discord.Status.offline]
-            total = len(members)
-            online_count = len(online)
-
-            member_lines = []
-            for m in online[:20]:
-                role = m.top_role.name if m.top_role.name != "@everyone" else ""
-                status = "🟢" if m.status == discord.Status.online else "🟡"
-                name = m.display_name
-                member_lines.append(
-                    f"{status} {name}" + (f" ({role})" if role else "")
-                )
-
-            result = f"**Thành viên đang online: {online_count}/{total}**\n"
-            result += "\n".join(member_lines)
-            if online_count > 20:
-                result += f"\n...và {online_count - 20} người nữa"
-
-            await message.channel.send(result, reference=message)
+            await message.channel.send(embed=_member_list_embed(message, bot), reference=message)
             return
 
         is_poll = any(kw in content_lower for kw in POLL_KEYWORDS)
@@ -735,24 +736,7 @@ async def on_message(message):
 
     is_member_list = any(kw in content_lower for kw in MEMBER_KEYWORDS)
     if is_member_list and message.guild:
-        members = message.guild.members
-        online = [m for m in members if m.status != discord.Status.offline]
-        total = len(members)
-        online_count = len(online)
-
-        member_lines = []
-        for m in online[:20]:
-            role = m.top_role.name if m.top_role.name != "@everyone" else ""
-            status = "🟢" if m.status == discord.Status.online else "🟡"
-            name = m.display_name
-            member_lines.append(f"{status} {name}" + (f" ({role})" if role else ""))
-
-        result = f"**Thành viên đang online: {online_count}/{total}**\n"
-        result += "\n".join(member_lines)
-        if online_count > 20:
-            result += f"\n...và {online_count - 20} người nữa"
-
-        await message.channel.send(result, reference=message)
+        await message.channel.send(embed=_member_list_embed(message, bot), reference=message)
         return
 
     # =========================
