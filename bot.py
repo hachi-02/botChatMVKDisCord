@@ -388,9 +388,10 @@ async def handle_event_creation(message) -> bool:
     else:
         loc_text = channel.mention if channel else ""
 
+    desc = f"📝 {description}" if description else None
     e = discord.Embed(
         title=f"📅 {name}",
-        description=(f"📝 {description}" if description else discord.Embed.Empty),
+        description=desc,
         color=0x9B59B6,
     )
     if bot.user:
