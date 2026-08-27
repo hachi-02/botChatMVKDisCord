@@ -1,5 +1,6 @@
 import asyncio
-from datetime import datetime, ZoneInfo
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from config import POINT_COOLDOWN, POINTS_PER_MSG, POINTS_PER_LEVEL
 from db import add_points, get_points, get_rank, get_top
