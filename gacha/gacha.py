@@ -127,27 +127,17 @@ async def handle_collection(channel, author, bot):
     uid = author.id
     rows = await get_collection(uid)
     owned = {r["char_key"]: r["dup_count"] for r in rows}
-    five = []
-    four = []
-    locked = []
+    lines = []
     for c in CHARACTER_POOL:
-        key = c["key"]
-        if key in owned:
-            line = f"{c['name']} x{owned[key]}"
-            (five if c["rarity"].startswith("5") else four).append(line)
+        sao = "5★" if c["rarity"].startswith("5") else "4★"
+        if c["key"] in owned:
+            emoji = "🟨" if c["rarity"].startswith("5") else "🟪"
+            lines.append(f"{emoji} {c['name']} ({sao}) x{owned[c['key']]}")
         else:
-            locked.append(f"{c['name']} x0")
-    parts = []
-    if five:
-        parts.append("```fix\n" + "\n".join(five) + "\n```")
-    if four:
-        parts.append("```ini\n" + "\n".join(f"[{x}]" for x in four) + "\n```")
-    if locked:
-        parts.append("```cs\n" + "\n".join(f"// {x}" for x in locked) + "\n```")
-    desc = "\n".join(parts) if parts else "Chưa có thẻ nào."
+            lines.append(f"🔒 {c['name']} ({sao}) x0")
     total = sum(owned.values())
     e = discord.Embed(title=f"🎴 Kho thẻ của {author.display_name}", color=EMBED_COLOR)
-    e.description = desc
+    e.description = "\n".join(lines) if lines else "Chưa có thẻ nào."
     e.set_footer(text=f"Đã có {len(owned)}/22 • {total} thẻ")
     await channel.send(embed=e)
 
