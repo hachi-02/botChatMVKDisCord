@@ -1,12 +1,10 @@
 import asyncio
 import io
-import math
 import os
 import random
 
 import aiohttp
 import discord
-from PIL import Image, ImageDraw, ImageFont, ImageSequence
 
 from db import (
     get_points,
@@ -64,41 +62,8 @@ IMG_CACHE = {}
 IMG_CACHE_MAX = 64
 
 
-def _rarity_color(rarity):
-    return (255, 215, 0) if rarity in ("5L", "5S") else (155, 89, 182)
-
-
-def _star_points(cx, cy, r, n=5):
-    pts = []
-    for i in range(n * 2):
-        ang = -math.pi / 2 + i * math.pi / n
-        rad = r if i % 2 == 0 else r * 0.45
-        pts.append((cx + rad * math.cos(ang), cy + rad * math.sin(ang)))
-    return pts
-
-
-def _draw_stars_row(draw, cx, cy, count, r, color):
-    if count <= 0:
-        return
-    spacing = r * 2.4
-    total = spacing * (count - 1)
-    x = cx - total / 2
-    for k in range(count):
-        draw.polygon(_star_points(x + k * spacing, cy, r), fill=color)
-
-
-def _vgradient(w, h, top, bottom):
-    base = Image.new("RGB", (w, h), top)
-    d = ImageDraw.Draw(base)
-    for y in range(h):
-        t = y / max(1, h - 1)
-        col = tuple(int(top[i] + (bottom[i] - top[i]) * t) for i in range(3))
-        d.line([(0, y), (w, y)], fill=col)
-    return base
-
-
-MAX_FRAMES = 14
-GIF_FRAME_MS = 90
+def _star_str(rarity):
+    return "★★★★★" if rarity in ("5L", "5S") else "★★★★"
 
 
 async def _get_img(session, r, w):
@@ -119,96 +84,19 @@ async def warm_image_cache():
         )
 
 
-async def _build_montage(results, is_new_list):
-    font_path = _font_path()
-    name_font = ImageFont.truetype(font_path, 26) if font_path else ImageFont.load_default()
-    tag_font = ImageFont.truetype(font_path, 20) if font_path else ImageFont.load_default()
-
-    cell_w = 190
-    img_h = 270
-    gap = 14
-    pad = 16
-    radius = 16
-    n = len(results)
-    total_w = pad * 2 + n * cell_w + (n - 1) * gap
-    total_h = pad * 2 + img_h + 86
-
+async def _build_gacha_files(results, is_new_list):
     async with aiohttp.ClientSession() as s:
-        fetched = await asyncio.gather(*[_get_img(s, r, cell_w) for r in results])
+        fetched = await asyncio.gather(*[_get_img(s, r, 200) for r in results])
     img_data = {k: d for k, d in fetched}
 
-    cell_frames = []
-    for r in results:
+    files = []
+    lines = []
+    for i, (r, is_new) in enumerate(zip(results, is_new_list), 1):
         data = img_data[r["key"]]
-        try:
-            im = Image.open(io.BytesIO(data))
-        except Exception as e:
-            print(f"LỖI OPEN IMG: {type(e).__name__}: {e}", flush=True)
-            im = Image.new("RGBA", (cell_w, img_h), (60, 63, 68, 255))
-        frames = []
-        try:
-            for fr in ImageSequence.Iterator(im):
-                f = fr.convert("RGBA").copy()
-                f.thumbnail((cell_w, img_h), Image.Resampling.LANCZOS)
-                frames.append(f)
-        except Exception:
-            f = im.convert("RGBA").copy()
-            f.thumbnail((cell_w, img_h), Image.Resampling.LANCZOS)
-            frames = [f]
-        if not frames:
-            frames = [Image.new("RGBA", (cell_w, img_h), (60, 63, 68, 255))]
-        if len(frames) > MAX_FRAMES:
-            step = len(frames) / MAX_FRAMES
-            frames = [frames[int(i * step)] for i in range(MAX_FRAMES)]
-        cell_frames.append(frames)
-
-    base = _vgradient(total_w, total_h, (28, 30, 35), (43, 45, 49))
-    bdraw = ImageDraw.Draw(base)
-    for i, (r, is_new) in enumerate(zip(results, is_new_list)):
-        x0 = pad + i * (cell_w + gap)
-        y0 = pad
-        rarity_color = _rarity_color(r["rarity"])
-        bdraw.rounded_rectangle(
-            [x0, y0, x0 + cell_w, y0 + img_h],
-            radius=radius,
-            fill=(47, 49, 54),
-            outline=rarity_color,
-            width=3,
-        )
-        name_y = y0 + img_h + 14
-        bdraw.text((x0 + cell_w // 2, name_y), r["name"], font=name_font, fill=rarity_color, anchor="mm")
-        star_y = name_y + 32
-        n_stars = 5 if r["rarity"] in ("5L", "5S") else 4
-        _draw_stars_row(bdraw, x0 + cell_w // 2, star_y, n_stars, 11, (255, 215, 0))
-        if is_new:
-            bdraw.text((x0 + cell_w // 2, star_y + 26), "MỚI!", font=tag_font, fill=(46, 204, 113), anchor="mm")
-
-    max_frames = max(len(f) for f in cell_frames)
-
-    out_frames = []
-    for t in range(max_frames):
-        frame = base.copy()
-        for i, r in enumerate(results):
-            x0 = pad + i * (cell_w + gap)
-            y0 = pad
-            fr = cell_frames[i][t % len(cell_frames[i])]
-            ix = x0 + (cell_w - fr.width) // 2
-            iy = y0 + (img_h - fr.height) // 2
-            frame.paste(fr, (ix, iy), fr)
-        out_frames.append(frame)
-
-    buf = io.BytesIO()
-    out_frames[0].save(
-        buf,
-        format="GIF",
-        save_all=True,
-        append_images=out_frames[1:],
-        duration=GIF_FRAME_MS,
-        loop=0,
-        disposal=2,
-    )
-    buf.seek(0)
-    return discord.File(buf, filename="gacha_result.gif")
+        files.append(discord.File(io.BytesIO(data), filename=f"{r['key']}.gif"))
+        tag = " — **MỚI!**" if is_new else ""
+        lines.append(f"{i}. **{r['name']}** {_star_str(r['rarity'])} ({RARITY_LABEL[r['rarity']]}){tag}")
+    return files, lines
 
 
 def roll_one(state):
@@ -269,11 +157,10 @@ async def handle_gacha(channel, author, bot, n):
     roll.set_image(url=GACHA_ROLL_GIF)
     msg = await channel.send(embed=roll)
 
-    task = asyncio.create_task(_build_montage(results, is_new_list))
     try:
-        file = await task
+        files, lines = await _build_gacha_files(results, is_new_list)
     except Exception as e:
-        print(f"LỖI MONTAGE: {type(e).__name__}: {e}", flush=True)
+        print(f"LỖI GACHA FILES: {type(e).__name__}: {e}", flush=True)
         try:
             await msg.delete()
         except Exception:
@@ -288,7 +175,10 @@ async def handle_gacha(channel, author, bot, n):
         await msg.delete()
     except Exception:
         pass
-    await channel.send(content=f"🎴 Kết quả quay **{n} lần** của {author.mention}:", file=file)
+    await channel.send(
+        content=f"🎴 Kết quả quay **{n} lần** của {author.mention}:\n" + "\n".join(lines),
+        files=files,
+    )
     for r in results:
         await add_card(uid, r["key"], r["rarity"])
 
