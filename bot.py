@@ -521,13 +521,18 @@ async def on_message(message):
             if len(options) > 10:
                 options = options[:10]
 
-            poll_text = f"**POLL: {question}**\n"
-            for i, opt in enumerate(options):
-                poll_text += f"{NUMBER_EMOJIS[i]} {opt}\n"
             sender = message.author.display_name or message.author.name
-            poll_text += f"\nBỏ phiếu bằng cách react số tương ứng! ({sender} tạo)"
-
-            poll_msg = await message.channel.send(poll_text)
+            e = discord.Embed(
+                title=f"📊 {question}",
+                description="\n".join(
+                    f"{NUMBER_EMOJIS[i]} {opt}" for i, opt in enumerate(options)
+                ),
+                color=EMBED_COLOR,
+            )
+            if bot.user:
+                e.set_author(name="Chị Cá 🐟", icon_url=bot.user.display_avatar.url)
+            e.set_footer(text=f"Bỏ phiếu bằng cách react số tương ứng! • {sender} tạo")
+            poll_msg = await message.channel.send(embed=e)
             for i in range(len(options)):
                 await poll_msg.add_reaction(NUMBER_EMOJIS[i])
             return
