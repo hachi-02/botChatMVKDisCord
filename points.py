@@ -98,9 +98,11 @@ async def handle_points(message, bot):
     embed = discord.Embed(title=f"🐟 {target.display_name}", color=_rank_color(rank))
     _author(embed, bot)
     embed.set_thumbnail(url=target.display_avatar.url)
-    embed.add_field(name="Điểm", value=f"**{pts}đ**", inline=True)
-    embed.add_field(name="Cấp", value=f"**{lvl}**", inline=True)
-    embed.add_field(name="Hạng", value=f"**{rank}**" if rank else "—", inline=True)
+    embed.add_field(
+        name="📊 Điểm • Cấp • Hạng",
+        value=f"**{pts}đ** • Cấp **{lvl}** • Hạng **{rank}**" if rank else f"**{pts}đ** • Cấp **{lvl}** • Hạng **—**",
+        inline=False,
+    )
     embed.add_field(
         name="Tiến độ",
         value=f"Lên Cấp {lvl+1}: [{_bar(pts)}] {pts % POINTS_PER_LEVEL}/{POINTS_PER_LEVEL}đ",
