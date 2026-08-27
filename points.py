@@ -4,7 +4,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from config import POINT_COOLDOWN, POINTS_PER_MSG, POINTS_PER_LEVEL
-from db import add_points, get_points, get_rank, get_top
+from db import add_points, get_points, get_rank, get_top, get_level
 
 cooldown = {}
 EMBED_COLOR = 0x1ABC9C
@@ -27,10 +27,10 @@ def _author(embed, bot):
 
 async def _award_and_notify(uid, author, channel, bot):
     old = await get_points(uid)
+    old_lvl = await get_level(uid)
     await add_points(uid, POINTS_PER_MSG)
     new = await get_points(uid)
-    old_lvl = old // POINTS_PER_LEVEL + 1
-    new_lvl = new // POINTS_PER_LEVEL + 1
+    new_lvl = await get_level(uid)
     if new_lvl > old_lvl:
         e = discord.Embed(
             title=f"🎉 {author.display_name} lên cấp {new_lvl}!",
@@ -81,7 +81,7 @@ async def handle_points(message, bot):
             if user is None:
                 user = bot.get_user(uid) or await bot.fetch_user(uid)
             name = user.display_name if user else f"user {uid}"
-            lvl = pts // POINTS_PER_LEVEL + 1
+            lvl = await get_level(r["user_id"])
             embed.add_field(
                 name=f"{medals.get(i, f'#{i}')} {name}",
                 value=f"**{pts}đ** • Cấp {lvl}",
@@ -95,7 +95,8 @@ async def handle_points(message, bot):
     target = message.mentions[0] if message.mentions else message.author
     pts = await get_points(target.id)
     rank = await get_rank(target.id)
-    lvl = pts // POINTS_PER_LEVEL + 1
+    lvl = await get_level(target.id)
+    prog = max(0, pts - (lvl - 1) * POINTS_PER_LEVEL)
     embed = discord.Embed(title=f"🐟 {target.display_name}", color=_rank_color(rank))
     _author(embed, bot)
     embed.set_thumbnail(url=target.display_avatar.url)
@@ -104,7 +105,7 @@ async def handle_points(message, bot):
     embed.add_field(name="Hạng", value=f"**{rank}**" if rank else "—", inline=True)
     embed.add_field(
         name="Tiến độ",
-        value=f"Lên Cấp {lvl+1}: [{_bar(pts)}] {pts % POINTS_PER_LEVEL}/{POINTS_PER_LEVEL}đ",
+        value=f"Lên Cấp {lvl+1}: [{_bar(prog)}] {prog}/{POINTS_PER_LEVEL}đ",
         inline=False,
     )
     icon = message.guild.icon.url if (message.guild and message.guild.icon) else discord.Embed.Empty

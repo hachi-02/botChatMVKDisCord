@@ -1,6 +1,6 @@
 from urllib.parse import urlparse, urlunparse, parse_qsl, urlencode
 
-from config import DATABASE_URL
+from config import DATABASE_URL, POINTS_PER_LEVEL
 
 db_pool = None
 _schema_ready = False
@@ -45,6 +45,13 @@ async def _ensure_schema():
         await conn.execute(SCHEMA_SQL)
         for s in GACHA_SCHEMA_SQL:
             await conn.execute(s)
+        await conn.execute(
+            "ALTER TABLE points ADD COLUMN IF NOT EXISTS max_level INTEGER NOT NULL DEFAULT 1"
+        )
+        await conn.execute(
+            "UPDATE points SET max_level = GREATEST(max_level, points / $1 + 1)",
+            POINTS_PER_LEVEL,
+        )
     _schema_ready = True
 
 
@@ -81,6 +88,10 @@ async def add_points(user_id: int, n: int):
             "points = points.points + $2, msgs = points.msgs + 1, last = now()",
             user_id, n,
         )
+        await db_pool.execute(
+            "UPDATE points SET max_level = GREATEST(max_level, points / $1 + 1) WHERE user_id=$2",
+            POINTS_PER_LEVEL, user_id,
+        )
     except Exception as e:
         print(f"LỖI ADD_POINTS: {type(e).__name__}: {e}", flush=True)
 
@@ -91,6 +102,14 @@ async def get_points(user_id: int) -> int:
     await _ensure_schema()
     row = await db_pool.fetchrow("SELECT points FROM points WHERE user_id=$1", user_id)
     return row["points"] if row else 0
+
+
+async def get_level(user_id: int) -> int:
+    if db_pool is None:
+        return 1
+    await _ensure_schema()
+    row = await db_pool.fetchrow("SELECT max_level FROM points WHERE user_id=$1", user_id)
+    return row["max_level"] if row else 1
 
 
 async def get_rank(user_id: int):
