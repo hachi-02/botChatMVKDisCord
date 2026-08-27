@@ -20,6 +20,7 @@ from config import (
     POLL_KEYWORDS,
     REMIND_KEYWORDS,
     EVENT_KEYWORDS,
+    EVENT_HELP_KEYWORDS,
     EVENT_REMIND_MINUTES,
     EVENT_DEFAULT_DURATION_MINUTES,
     EMOJI_MAP,
@@ -40,6 +41,18 @@ remind_queue = []
 event_queue = []
 
 NUMBER_EMOJIS = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"]
+
+EVENT_HELP_TEXT = (
+    "📌 **Cách tạo sự kiện:**\n"
+    "`chị cá tạo sự kiện Tên | thời gian | mô tả | địa điểm`\n"
+    "• **Tên** và **thời gian** là bắt buộc.\n"
+    "• **Mô tả** và **địa điểm** không bắt buộc.\n"
+    "• Địa điểm trùng tên voice channel → tạo sự kiện trong kênh đó, "
+    "không thì là sự kiện ngoài (`Online` mặc định).\n"
+    "**Ví dụ:**\n"
+    "• `chị cá tạo sự kiện Sinh nhật | ngày mai 20h | mang bánh | voice chung`\n"
+    "• `chị cá event Offline | 25/12 19h30` 🐟"
+)
 
 
 def parse_remind_time(text: str):
@@ -205,23 +218,20 @@ async def handle_event_creation(message) -> bool:
         raw = raw.replace(role.mention, "")
     raw = raw.strip()
 
+    content_lower = message.content.lower()
+    is_help = any(kw in content_lower for kw in EVENT_HELP_KEYWORDS)
+
+    if is_help or not raw:
+        await message.channel.send(EVENT_HELP_TEXT, reference=message)
+        return True
+
     if "|" not in raw:
         return False
 
     parts = [p.strip() for p in raw.split("|") if p.strip()]
 
     if len(parts) < 2:
-        await message.channel.send(
-            "Chị chưa rõ thông tin sự kiện!\n"
-            "**📌 Format:**\n"
-            "`chị cá tạo sự kiện Tên | thời gian | mô tả | địa điểm`\n"
-            "• Tên và thời gian là bắt buộc.\n"
-            "• Mô tả và địa điểm không bắt buộc.\n"
-            "**Ví dụ:**\n"
-            "• `chị cá tạo sự kiện Sinh nhật | ngày mai 20h | mang bánh | voice chung`\n"
-            "• `chị cá event Offline | 25/12 19h30`",
-            reference=message,
-        )
+        await message.channel.send(EVENT_HELP_TEXT, reference=message)
         return True
 
     name = parts[0]

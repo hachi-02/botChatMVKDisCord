@@ -60,6 +60,10 @@ POLL_KEYWORDS = ["poll", "vote", "bầu", "bỏ phiếu"]
 REMIND_KEYWORDS = ["nhắc t", "remind", "nhắc tôi", "nhắc em"]
 
 EVENT_KEYWORDS = ["tạo sự kiện", "tạo event", "lên lịch", "event", "schedule"]
+EVENT_HELP_KEYWORDS = [
+    "như nào", "cách", "hướng dẫn", "làm sao", "như thế nào",
+    "dùng sao", "guide", "how to", "how",
+]
 EVENT_REMIND_MINUTES = 15
 EVENT_DEFAULT_DURATION_MINUTES = 120
 
