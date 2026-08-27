@@ -1,5 +1,6 @@
 import asyncio
 import random
+import urllib.parse
 
 import discord
 
@@ -36,18 +37,39 @@ def _star_str(rarity):
     return "★★★★★" if rarity in ("5L", "5S") else "★★★★"
 
 
-def _build_gacha_embeds(results, is_new_list):
-    embeds = []
-    for r, is_new in zip(results, is_new_list):
-        e = discord.Embed(title=r["name"], color=RARITY_COLOR.get(r["rarity"], EMBED_COLOR))
-        stars = _star_str(r["rarity"])
-        desc = f"{stars}  ({RARITY_LABEL[r['rarity']]})"
+def _public_id(url):
+    after = url.split("/upload/")[1]
+    if after.startswith("v") and "/" in after:
+        after = after.split("/", 1)[1]
+    return after
+
+
+def _montage_url(results, is_new_list):
+    cell_w = 80
+    gap = 12
+    ids = list(results)
+    base = _public_id(ids[0]["url"])
+    segs = [f"w_{cell_w},b_rgb:2b2d31,g_north_west,x_0,y_0"]
+    for i in range(1, len(ids)):
+        x = i * (cell_w + gap)
+        segs.append(
+            f"l_{_public_id(ids[i]['url'])},w_{cell_w},b_rgb:2b2d31,g_north_west,x_{x},y_0/fl_layer_apply"
+        )
+    for i, (r, is_new) in enumerate(zip(ids, is_new_list)):
+        x = i * (cell_w + gap)
+        name = urllib.parse.quote(r["name"], safe="")
+        stars = urllib.parse.quote(_star_str(r["rarity"]), safe="")
+        segs.append(f"l_text:arial_18:{name},co_rgb:FFD700,g_north_west,x_{x},y_92/fl_layer_apply")
+        segs.append(f"l_text:arial_18:{stars},co_rgb:FFD700,g_north_west,x_{x},y_114/fl_layer_apply")
         if is_new:
-            desc += "\n✨ **MỚI!**"
-        e.description = desc
-        e.set_image(url=_anim(r["url"], 80))
-        embeds.append(e)
-    return embeds
+            segs.append(f"l_text:arial_18:MOI,co_rgb:2ECC71,g_north_west,x_{x},y_136/fl_layer_apply")
+    return f"https://res.cloudinary.com/z2ffqaaf/image/upload/{'/'.join(segs)}/f_webp/{base}"
+
+
+def _build_gacha_embeds(results, is_new_list):
+    e = discord.Embed(title="🎴 Kết quả gacha", color=EMBED_COLOR)
+    e.set_image(url=_montage_url(results, is_new_list))
+    return [e]
 
 
 def roll_one(state):
