@@ -29,7 +29,7 @@ NAME_BY_KEY = {c["key"]: c["name"] for c in CHARACTER_POOL}
 
 
 def _anim(url, w=300):
-    return url.replace("/upload/", f"/upload/f_gif,w_{w}/", 1)
+    return url.replace("/upload/", f"/upload/f_webp,w_{w}/", 1)
 
 
 def _star_str(rarity):
@@ -45,7 +45,7 @@ def _build_gacha_embeds(results, is_new_list):
         if is_new:
             desc += "\n✨ **MỚI!**"
         e.description = desc
-        e.set_image(url=_anim(r["url"], 300))
+        e.set_image(url=_anim(r["url"], 250))
         embeds.append(e)
     return embeds
 
@@ -107,7 +107,7 @@ async def handle_gacha(channel, author, bot, n):
     roll = discord.Embed(title="🎰 Đang quay...", color=EMBED_COLOR)
     roll.set_image(url=GACHA_ROLL_GIF)
     msg = await channel.send(embed=roll)
-    await asyncio.sleep(5.0)
+    await asyncio.sleep(6.0)
     try:
         await msg.delete()
     except Exception:
