@@ -231,15 +231,16 @@ async def get_collection(user_id: int):
 
 
 async def get_pvp_rating(user_id: int):
+    default = {"rating": 1000, "wins": 0, "losses": 0}
     if db_pool is None:
-        return 1000
+        return default
     await _ensure_schema()
     row = await db_pool.fetchrow(
         "SELECT rating, wins, losses FROM pvp_rank WHERE user_id=$1", user_id
     )
     if row is None:
-        return 1000
-    return row
+        return default
+    return {"rating": row["rating"], "wins": row["wins"], "losses": row["losses"]}
 
 
 async def get_pvp_top(limit: int = 10):
