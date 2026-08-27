@@ -389,125 +389,126 @@ async def on_message(message):
         if handled:
             return
 
-    if not bot_mentioned and not role_mentioned:
-        if not any(kw in content_lower for kw in KEYWORDS):
+    if addressed:
+        is_member_list = any(kw in content_lower for kw in MEMBER_KEYWORDS)
+        if is_member_list and message.guild:
+            members = message.guild.members
+            online = [m for m in members if m.status != discord.Status.offline]
+            total = len(members)
+            online_count = len(online)
 
-            is_member_list = any(kw in content_lower for kw in MEMBER_KEYWORDS)
-            if is_member_list and message.guild:
-                members = message.guild.members
-                online = [m for m in members if m.status != discord.Status.offline]
-                total = len(members)
-                online_count = len(online)
-
-                member_lines = []
-                for m in online[:20]:
-                    role = m.top_role.name if m.top_role.name != "@everyone" else ""
-                    status = "🟢" if m.status == discord.Status.online else "🟡"
-                    name = m.display_name
-                    member_lines.append(
-                        f"{status} {name}" + (f" ({role})" if role else "")
-                    )
-
-                result = f"**Thành viên đang online: {online_count}/{total}**\n"
-                result += "\n".join(member_lines)
-                if online_count > 20:
-                    result += f"\n...và {online_count - 20} người nữa"
-
-                await message.channel.send(result, reference=message)
-                return
-
-            is_poll = any(kw in content_lower for kw in POLL_KEYWORDS)
-            if is_poll:
-                raw = message.content
-                raw = re.sub(r"(?i)^(chị\s*cá|chica)\s*", "", raw).strip()
-                raw = re.sub(r"(?i)^(poll|vote|bầu|bỏ\s*phiếu)\s*", "", raw).strip()
-                options = [o.strip() for o in re.split(r"\||;", raw) if o.strip()]
-
-                if len(options) < 2:
-                    await message.channel.send(
-                        "Em viết chưa đúng format rồi. "
-                        "Gõ: `poll pizza | phở | cơm` (phân tách bằng `|`) 🐟",
-                        reference=message,
-                    )
-                    return
-
-                if len(options) > 10:
-                    options = options[:10]
-
-                poll_text = f"**POLL: {options[0]}**\n"
-                for i, opt in enumerate(options):
-                    poll_text += f"{NUMBER_EMOJIS[i]} {opt}\n"
-                sender = message.author.display_name or message.author.name
-                poll_text += f"\nBỏ phiếu bằng cách react số tương ứng! ({sender} tạo)"
-
-                poll_msg = await message.channel.send(poll_text)
-                for i in range(len(options)):
-                    await poll_msg.add_reaction(NUMBER_EMOJIS[i])
-                return
-
-            is_remind = any(kw in content_lower for kw in REMIND_KEYWORDS)
-            if is_remind:
-                raw = message.content
-                raw = re.sub(r"(?i)^(chị\s*cá|chica)\s*", "", raw).strip()
-                raw = re.sub(
-                    r"(?i)^(nhắc\s*(t|tôi|em|e|tui)|remind)\s*", "", raw
-                ).strip()
-
-                now = datetime.now(ZoneInfo("Asia/Ho_Chi_Minh"))
-                remind_time = parse_remind_time(raw)
-                if not remind_time:
-                    await message.channel.send(
-                        "Chị chưa hiểu thời gian em muốn nhắc!\n"
-                        "**📌 Ví dụ cách dùng:**\n"
-                        "• `nhắc em 30 phút học bài`->`30 phút đếm ngược`\n"
-                        "• `nhắc em 1 tiếng học bài`->`1 tiếng đếm ngược`\n"
-                        "• `nhắc em 7h học bài`->`7:00 giờ cố định`\n"
-                        "• `nhắc em ngày mai 8h30 dậy`\n"
-                        "• `nhắc em 25/12 đi chợ`\n\n"
-                        "💡Chỉ cần nói thời gian + việc cần nhắc là được!",
-                        reference=message,
-                    )
-                    return
-
-                task = re.sub(
-                    r"(?:ngày\s*mai|mai)\s*\d+[h:]\d*\b", "", raw, flags=re.IGNORECASE
-                ).strip()
-                task = re.sub(
-                    r"\d+/\d+\s*\d+[h:]\d*\b", "", task, flags=re.IGNORECASE
-                ).strip()
-                task = re.sub(r"\d+/\d+\b", "", task, flags=re.IGNORECASE).strip()
-                task = re.sub(
-                    r"\d+\s*(phút|giờ|ngày|giây|min|p|h|hour|day|second|tieng|tiếng)[\s:]*\d*",
-                    "",
-                    task,
-                    flags=re.IGNORECASE,
-                ).strip()
-                if not task:
-                    task = "đến giờ rồi"
-
-                remind_queue.append(
-                    {
-                        "user_id": message.author.id,
-                        "channel_id": message.channel.id,
-                        "time": remind_time,
-                        "task": task,
-                    }
+            member_lines = []
+            for m in online[:20]:
+                role = m.top_role.name if m.top_role.name != "@everyone" else ""
+                status = "🟢" if m.status == discord.Status.online else "🟡"
+                name = m.display_name
+                member_lines.append(
+                    f"{status} {name}" + (f" ({role})" if role else "")
                 )
 
-                diff = remind_time - now
-                hours, remainder = divmod(int(diff.total_seconds()), 3600)
-                minutes = remainder // 60
-                time_str = ""
-                if hours > 0:
-                    time_str += f"{hours} tiếng "
-                if minutes > 0:
-                    time_str += f"{minutes} phút"
+            result = f"**Thành viên đang online: {online_count}/{total}**\n"
+            result += "\n".join(member_lines)
+            if online_count > 20:
+                result += f"\n...và {online_count - 20} người nữa"
 
+            await message.channel.send(result, reference=message)
+            return
+
+        is_poll = any(kw in content_lower for kw in POLL_KEYWORDS)
+        if is_poll:
+            raw = message.content
+            raw = re.sub(r"(?i)^(chị\s*cá|chica)\s*", "", raw).strip()
+            raw = re.sub(r"(?i)^(poll|vote|bầu|bỏ\s*phiếu)\s*", "", raw).strip()
+            options = [o.strip() for o in re.split(r"\||;", raw) if o.strip()]
+
+            if len(options) < 2:
                 await message.channel.send(
-                    f"OK em, {time_str} nữa chị sẽ nhắc: **{task}** 🐟",
+                    "Em viết chưa đúng format rồi. "
+                    "Gõ: `poll pizza | phở | cơm` (phân tách bằng `|`) 🐟",
                     reference=message,
                 )
                 return
+
+            if len(options) > 10:
+                options = options[:10]
+
+            poll_text = f"**POLL: {options[0]}**\n"
+            for i, opt in enumerate(options):
+                poll_text += f"{NUMBER_EMOJIS[i]} {opt}\n"
+            sender = message.author.display_name or message.author.name
+            poll_text += f"\nBỏ phiếu bằng cách react số tương ứng! ({sender} tạo)"
+
+            poll_msg = await message.channel.send(poll_text)
+            for i in range(len(options)):
+                await poll_msg.add_reaction(NUMBER_EMOJIS[i])
+            return
+
+        is_remind = any(kw in content_lower for kw in REMIND_KEYWORDS)
+        if is_remind:
+            raw = message.content
+            raw = re.sub(r"(?i)^(chị\s*cá|chica)\s*", "", raw).strip()
+            raw = re.sub(
+                r"(?i)^(nhắc\s*(t|tôi|em|e|tui)|remind)\s*", "", raw
+            ).strip()
+
+            now = datetime.now(ZoneInfo("Asia/Ho_Chi_Minh"))
+            remind_time = parse_remind_time(raw)
+            if not remind_time:
+                await message.channel.send(
+                    "Chị chưa hiểu thời gian em muốn nhắc!\n"
+                    "**📌 Ví dụ cách dùng:**\n"
+                    "• `nhắc em 30 phút học bài`->`30 phút đếm ngược`\n"
+                    "• `nhắc em 1 tiếng học bài`->`1 tiếng đếm ngược`\n"
+                    "• `nhắc em 7h học bài`->`7:00 giờ cố định`\n"
+                    "• `nhắc em ngày mai 8h30 dậy`\n"
+                    "• `nhắc em 25/12 đi chợ`\n\n"
+                    "💡Chỉ cần nói thời gian + việc cần nhắc là được!",
+                    reference=message,
+                )
+                return
+
+            task = re.sub(
+                r"(?:ngày\s*mai|mai)\s*\d+[h:]\d*\b", "", raw, flags=re.IGNORECASE
+            ).strip()
+            task = re.sub(
+                r"\d+/\d+\s*\d+[h:]\d*\b", "", task, flags=re.IGNORECASE
+            ).strip()
+            task = re.sub(r"\d+/\d+\b", "", task, flags=re.IGNORECASE).strip()
+            task = re.sub(
+                r"\d+\s*(phút|giờ|ngày|giây|min|p|h|hour|day|second|tieng|tiếng)[\s:]*\d*",
+                "",
+                task,
+                flags=re.IGNORECASE,
+            ).strip()
+            if not task:
+                task = "đến giờ rồi"
+
+            remind_queue.append(
+                {
+                    "user_id": message.author.id,
+                    "channel_id": message.channel.id,
+                    "time": remind_time,
+                    "task": task,
+                }
+            )
+
+            diff = remind_time - now
+            hours, remainder = divmod(int(diff.total_seconds()), 3600)
+            minutes = remainder // 60
+            time_str = ""
+            if hours > 0:
+                time_str += f"{hours} tiếng "
+            if minutes > 0:
+                time_str += f"{minutes} phút"
+
+            await message.channel.send(
+                f"OK em, {time_str} nữa chị sẽ nhắc: **{task}** 🐟",
+                reference=message,
+            )
+            return
+
+    if not bot_mentioned and not role_mentioned:
+        if not any(kw in content_lower for kw in KEYWORDS):
 
             is_proactive = (
                 len(message.content) > MIN_MESSAGE_LENGTH
