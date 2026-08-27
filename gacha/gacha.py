@@ -1,9 +1,6 @@
 import asyncio
-import io
-import os
 import random
 
-import aiohttp
 import discord
 
 from db import (
@@ -31,72 +28,26 @@ GACHA_ROLL_GIF = "https://res.cloudinary.com/z2ffqaaf/image/upload/v1787830778/a
 NAME_BY_KEY = {c["key"]: c["name"] for c in CHARACTER_POOL}
 
 
-def _thumb(url, w=400):
-    return url.replace("/upload/", f"/upload/w_{w}/", 1)
-
-
-def _anim(url, w=230):
+def _anim(url, w=300):
     return url.replace("/upload/", f"/upload/f_gif,w_{w}/", 1)
-
-
-async def _fetch_image(session, url):
-    async with session.get(url) as resp:
-        resp.raise_for_status()
-        return await resp.read()
-
-
-def _font_path():
-    here = os.path.dirname(__file__)
-    candidates = [
-        os.path.join(here, "fonts", "NotoSans-Regular.ttf"),
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-        "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf",
-    ]
-    for p in candidates:
-        if os.path.exists(p):
-            return p
-    return None
-
-
-IMG_CACHE = {}
-IMG_CACHE_MAX = 64
 
 
 def _star_str(rarity):
     return "★★★★★" if rarity in ("5L", "5S") else "★★★★"
 
 
-async def _get_img(session, r, w):
-    key = r["key"]
-    if key in IMG_CACHE:
-        return key, IMG_CACHE[key]
-    data = await _fetch_image(session, _anim(r["url"], w))
-    if len(IMG_CACHE) < IMG_CACHE_MAX:
-        IMG_CACHE[key] = data
-    return key, data
-
-
-async def warm_image_cache():
-    async with aiohttp.ClientSession() as s:
-        await asyncio.gather(
-            *[_get_img(s, c, 190) for c in CHARACTER_POOL],
-            return_exceptions=True,
-        )
-
-
-async def _build_gacha_files(results, is_new_list):
-    async with aiohttp.ClientSession() as s:
-        fetched = await asyncio.gather(*[_get_img(s, r, 200) for r in results])
-    img_data = {k: d for k, d in fetched}
-
-    files = []
-    lines = []
-    for i, (r, is_new) in enumerate(zip(results, is_new_list), 1):
-        data = img_data[r["key"]]
-        files.append(discord.File(io.BytesIO(data), filename=f"{r['key']}.gif"))
-        tag = " — **MỚI!**" if is_new else ""
-        lines.append(f"{i}. **{r['name']}** {_star_str(r['rarity'])} ({RARITY_LABEL[r['rarity']]}){tag}")
-    return files, lines
+def _build_gacha_embeds(results, is_new_list):
+    embeds = []
+    for r, is_new in zip(results, is_new_list):
+        e = discord.Embed(title=r["name"], color=RARITY_COLOR.get(r["rarity"], EMBED_COLOR))
+        stars = _star_str(r["rarity"])
+        desc = f"{stars}  ({RARITY_LABEL[r['rarity']]})"
+        if is_new:
+            desc += "\n✨ **MỚI!**"
+        e.description = desc
+        e.set_image(url=_anim(r["url"], 300))
+        embeds.append(e)
+    return embeds
 
 
 def roll_one(state):
@@ -156,28 +107,16 @@ async def handle_gacha(channel, author, bot, n):
     roll = discord.Embed(title="🎰 Đang quay...", color=EMBED_COLOR)
     roll.set_image(url=GACHA_ROLL_GIF)
     msg = await channel.send(embed=roll)
-
-    try:
-        files, lines = await _build_gacha_files(results, is_new_list)
-    except Exception as e:
-        print(f"LỖI GACHA FILES: {type(e).__name__}: {e}", flush=True)
-        try:
-            await msg.delete()
-        except Exception:
-            pass
-        names = " | ".join(r["name"] for r in results)
-        await channel.send(content=f"🎴 Kết quả quay **{n} lần** của {author.mention}: {names}")
-        for r in results:
-            await add_card(uid, r["key"], r["rarity"])
-        return
-
+    await asyncio.sleep(5.0)
     try:
         await msg.delete()
     except Exception:
         pass
+
+    embeds = _build_gacha_embeds(results, is_new_list)
     await channel.send(
-        content=f"🎴 Kết quả quay **{n} lần** của {author.mention}:\n" + "\n".join(lines),
-        files=files,
+        content=f"🎴 Kết quả quay **{n} lần** của {author.mention}:",
+        embeds=embeds,
     )
     for r in results:
         await add_card(uid, r["key"], r["rarity"])
