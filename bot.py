@@ -99,6 +99,7 @@ def _menu_embed(bot):
         ("🔎 Tóm tắt", "`chị cá` + `tóm tắt 1 tiếng` / `tóm tắt 30 tin`"),
         ("🏆 Điểm", "`chị cá` + `điểm` / `chị cá top`"),
         ("🎴 Gacha", "`chị cá` + `gacha` / `gacha 1` / `gacha 5` (50đ / 250đ)"),
+        ("🗃️ Kho thẻ", "`chị cá` + `kho` (xem các thẻ đã có)"),
     ]
     for name, val in items:
         e.add_field(name=name, value=val, inline=True)
@@ -708,7 +709,7 @@ async def on_message(message):
             pts = await get_points(message.author.id)
             e = discord.Embed(
                 title="🎰 Gacha Thẻ Genshin",
-                description=f"Chọn số lượt quay:\n💰 Điểm hiện có: **{pts}đ**",
+                description=f"💰 Điểm hiện có: **{pts}đ**\nChọn số lượt quay:",
                 color=EMBED_COLOR,
             )
             e.set_footer(text="1 lần = 50đ • 5 lần = 250đ")
