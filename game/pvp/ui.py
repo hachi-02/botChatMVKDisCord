@@ -180,9 +180,11 @@ class ControlPanelView(discord.ui.View):
         self.btn_normal = discord.ui.Button(label="⚔️ Đánh thường", style=discord.ButtonStyle.secondary)
         self.btn_skill = discord.ui.Button(label="🔥 Skill", style=discord.ButtonStyle.primary, disabled=(sp <= 0))
         self.btn_ult = discord.ui.Button(label="✨ Ultimate", style=discord.ButtonStyle.danger)
+        self.btn_surrender = discord.ui.Button(label="🏳️ Đầu hàng", style=discord.ButtonStyle.danger)
         self.btn_normal.callback = lambda i: self._act(i, "normal")
         self.btn_skill.callback = lambda i: self._act(i, "skill")
         self.btn_ult.callback = lambda i: self._act(i, "ultimate")
+        self.btn_surrender.callback = self._surrender
         self.add_item(self.btn_normal)
         self.add_item(self.btn_skill)
         self.add_item(self.btn_ult)
@@ -190,6 +192,7 @@ class ControlPanelView(discord.ui.View):
             self.btn_skip_pending = discord.ui.Button(label="⏭️ Bỏ đánh thường", style=discord.ButtonStyle.secondary)
             self.btn_skip_pending.callback = self._skip_pending
             self.add_item(self.btn_skip_pending)
+        self.add_item(self.btn_surrender)
 
     def _add_selects(self, chars: list, enemies: list):
         if chars:
@@ -221,11 +224,33 @@ class ControlPanelView(discord.ui.View):
         await interaction.response.defer()
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        return interaction.user.id == self.battle._owner_active().id
+        return interaction.user.id in (self.battle.a_user.id, self.battle.b_user.id)
+
+    async def _surrender(self, interaction: discord.Interaction):
+        battle = self.battle
+        if battle.done:
+            return
+        if interaction.user.id == battle.a_user.id:
+            winner = "B"
+        elif interaction.user.id == battle.b_user.id:
+            winner = "A"
+        else:
+            await interaction.response.send_message("Em không phải người trong trận!", ephemeral=True)
+            return
+        for it in self.children:
+            it.disabled = True
+        await interaction.response.edit_message(view=self)
+        self.stop()
+        await _finish_battle(battle, winner, surrender=True)
 
     async def _skip_pending(self, interaction: discord.Interaction):
         battle = self.battle
         if battle.done:
+            return
+        if interaction.user.id != battle._owner_active().id:
+            await interaction.response.send_message(
+                "⚠️ Không phải lượt của em!", ephemeral=True
+            )
             return
         team = battle._active_team()
         actor = battle.pending_actor(team)
@@ -239,15 +264,50 @@ class ControlPanelView(discord.ui.View):
 
     async def _act(self, interaction: discord.Interaction, action: str):
         battle = self.battle
+        if interaction.user.id != battle._owner_active().id:
+            await interaction.response.send_message(
+                "⚠️ Không phải lượt của em!", ephemeral=True
+            )
+            return
         char_select = getattr(self, "char_select", None)
         target_select = getattr(self, "target_select", None)
         char_key = char_select.values[0] if (char_select and char_select.values) else None
         if char_key is None:
-            await interaction.response.send_message("Hãy chọn ① thẻ hành động!", ephemeral=True)
+            await interaction.response.send_message(
+                "⚠️ Hãy chọn ① thẻ hành động trước khi bấm nút!", ephemeral=True
+            )
             return
         actor = next((f for f in battle._active_team() if f.key == char_key), None)
-        if actor is None or not actor.alive or actor.turn_done or actor.stunned:
-            await interaction.response.send_message("Thẻ không hợp lệ!", ephemeral=True)
+        if actor is None or not actor.alive:
+            await interaction.response.send_message(
+                "⚠️ Thẻ này đã bị hạ gục, không thể hành động!", ephemeral=True
+            )
+            return
+        if actor.turn_done:
+            await interaction.response.send_message(
+                f"✅ {actor.name} đã kết thúc hành động trong lượt này, hãy chọn thẻ khác!",
+                ephemeral=True,
+            )
+            return
+        if actor.stunned:
+            await interaction.response.send_message(
+                f"⭐ {actor.name} đang bị choáng, không thể hành động!", ephemeral=True
+            )
+            return
+
+        pending = battle.pending_actor(battle._active_team())
+        if pending is not None and pending is not actor:
+            await interaction.response.send_message(
+                f"🔒 {pending.name} vừa dùng skill và còn 1 hành động nữa — "
+                f"hãy đánh thường / ulti / bỏ đánh thường cho {pending.name} trước!",
+                ephemeral=True,
+            )
+            return
+        if action == "skill" and actor.pending:
+            await interaction.response.send_message(
+                f"🔥 {actor.name} đã dùng skill rồi, hãy đánh thường, ulti hoặc bỏ đánh thường để hoàn tất!",
+                ephemeral=True,
+            )
             return
 
         eff = actor.skill if action == "skill" else (actor.ultimate if action == "ultimate" else None)
@@ -256,22 +316,37 @@ class ControlPanelView(discord.ui.View):
         if needs_target:
             tkey = target_select.values[0] if (target_select and target_select.values) else None
             if tkey is None:
-                await interaction.response.send_message("Hãy chọn ② mục tiêu địch!", ephemeral=True)
+                await interaction.response.send_message(
+                    "⚠️ Hãy chọn ② đối tượng (mục tiêu) để tấn công trước!",
+                    ephemeral=True,
+                )
                 return
             target = next((e for e in battle._enemy_of(actor) if e.key == tkey and e.alive), None)
             if target is None:
-                await interaction.response.send_message("Mục tiêu không hợp lệ!", ephemeral=True)
+                await interaction.response.send_message(
+                    "⚠️ Mục tiêu đã chọn không hợp lệ (có thể đã bị hạ gục)!",
+                    ephemeral=True,
+                )
                 return
 
         sp = battle._sp_of(actor)
         if action == "skill" and sp <= 0:
-            await interaction.response.send_message("Hết Skill Point! 🔋", ephemeral=True)
+            await interaction.response.send_message(
+                "🔥 Không đủ Skill Point để dùng skill! (hết SP, hãy đánh thường để nạp)",
+                ephemeral=True,
+            )
             return
         if action == "ultimate" and actor.energy < PVP_ENERGY_MAX:
-            await interaction.response.send_message("Chưa đủ energy Ultimate! ⚡", ephemeral=True)
+            await interaction.response.send_message(
+                f"⚡ Không đủ năng lượng để dùng Ultimate! "
+                f"({actor.energy}/{PVP_ENERGY_MAX} — đánh thường hoặc skill để nạp)",
+                ephemeral=True,
+            )
             return
         if not battle.apply_action(actor, action, target):
-            await interaction.response.send_message("Không thể thực hiện hành động này!", ephemeral=True)
+            await interaction.response.send_message(
+                "⚠️ Không thể thực hiện hành động này!", ephemeral=True
+            )
             return
 
         for it in self.children:
@@ -325,7 +400,7 @@ async def _resolve(session: PVPSession, interaction: discord.Interaction):
     except Exception:
         pass
 
-    battle.message = await interaction.followup.send(
+    battle.message = await interaction.channel.send(
         embed=discord.Embed(title="⚔️ Đang vào trận...", color=PVP_COLOR)
     )
     await _post_panel(battle)
@@ -353,12 +428,36 @@ async def _after_action(battle: BattleSession):
         await _finish_battle(battle, w)
         return
     active = battle._active_team()
+    finished_turn = False
     if not battle.available_chars(active):
         battle.end_rotation()
+        finished_turn = True
     await _post_panel(battle)
+    if finished_turn and battle.log:
+        await _notify_turn_log(battle)
 
 
-async def _finish_battle(battle: BattleSession, winner):
+async def _notify_turn_log(battle: BattleSession):
+    """Gửi thông báo riêng tóm tắt diễn biến của lượt vừa kết thúc."""
+    if battle.done or not battle.channel or not battle.log:
+        return
+    try:
+        log = battle.log
+        e = discord.Embed(
+            title=f"📜 Diễn biến lượt {battle.round - 1}",
+            color=PVP_COLOR,
+        )
+        e.set_author(name="Chị Cá 🐟 PvP")
+        shown = log[:12] + (["..."] if len(log) > 12 else [])
+        e.description = "```" + "\n".join(shown) + "```"
+        e.set_footer(text=f"⚔️ Đến lượt {battle._owner_active().display_name}")
+        await battle.channel.send(embed=e)
+        battle.log = []
+    except Exception as err:
+        print("LỖI NOTIFY_TURN_LOG:", err, flush=True)
+
+
+async def _finish_battle(battle: BattleSession, winner, surrender: bool = False):
     battle.done = True
     ra_row = await get_pvp_rating(battle.a_user.id)
     rb_row = await get_pvp_rating(battle.b_user.id)
@@ -384,7 +483,7 @@ async def _finish_battle(battle: BattleSession, winner):
         "team_a": battle.team_a,
         "team_b": battle.team_b,
     }
-    embed = _result_embed(battle, result, ra, rb, na, nb, win_user, lose_user, draw)
+    embed = _result_embed(battle, result, ra, rb, na, nb, win_user, lose_user, draw, surrender)
     try:
         await battle.message.edit(embed=embed, view=None)
     except Exception as e:
@@ -453,15 +552,20 @@ def _battle_embed(battle: BattleSession):
     return e
 
 
-def _result_embed(battle, result, ra, rb, na, nb, win_user, lose_user, draw):
+def _result_embed(battle, result, ra, rb, na, nb, win_user, lose_user, draw, surrender=False):
     if draw:
         title = "🤝 HÒA!"
         color = 0x95A5A6
+    elif surrender:
+        title = f"🏳️ {win_user.display_name} THẮNG (đối thủ đầu hàng)!"
+        color = 0xE67E22
     else:
         title = f"🏆 {win_user.display_name} THẮNG!"
         color = ROLE_COLOR.get("DPS", PVP_COLOR)
     e = discord.Embed(title=title, color=color)
     e.set_author(name="Chị Cá 🐟 PvP")
+    if surrender and lose_user is not None:
+        e.description = f"🏳️ {lose_user.mention} đã đầu hàng, nhường chiến thắng cho {win_user.mention}."
 
     ta = result["team_a"]
     tb = result["team_b"]
