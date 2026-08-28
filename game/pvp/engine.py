@@ -231,7 +231,40 @@ class BattleSession:
                 low = min(cands, key=lambda f: f.hp / f.max_hp)
                 low.hp = min(low.max_hp, low.hp + 5)
 
+    def advance_turn(self) -> bool:
+        """Chuyển lượt xen kẽ sang team đối diện sau MỖI hành động đơn lẻ.
+        Nếu thẻ vừa dùng skill còn nợ 1 hành động (pending), giữ nguyên lượt
+        của team đó để đánh nốt trước khi đổi bên.
+        Trả về True nếu vừa mở vòng đánh mới cho team sắp có lượt (dùng để
+        biết khi nào nên gửi tóm tắt diễn biến / hồi máu hỗ trợ đầu vòng)."""
+        team = self._active_team()
+        if self.pending_actor(team) is not None:
+            return False
+
+        self.active_team = "B" if self.active_team == "A" else "A"
+        new_team = self._active_team()
+
+        new_round = False
+        if not self.available_chars(new_team):
+            # Team sắp tới lượt đã dùng hết thẻ (hoặc bị choáng hết) trong vòng
+            # trước đó của chính họ -> mở vòng đánh mới cho team này.
+            for f in new_team:
+                f.stunned = False
+                f.turn_done = False
+                f.pending = False
+            self.round += 1
+            new_round = True
+
+        # Hồi máu hỗ trợ (SUP) mỗi khi team bắt đầu một vòng đánh mới của họ
+        # (áp dụng cả cho lượt đầu tiên của mỗi bên khi vào trận).
+        if all(not f.turn_done for f in new_team if f.alive):
+            self._start_rotation(new_team)
+
+        return new_round
+
     def end_rotation(self):
+        """Giữ lại để tương thích ngược — không còn được gọi trong luồng
+        xen kẽ mới (xem advance_turn)."""
         for f in self._active_team():
             f.stunned = False
         self.active_team = "B" if self.active_team == "A" else "A"

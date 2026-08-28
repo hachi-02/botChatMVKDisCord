@@ -575,6 +575,8 @@ async def _resolve(session: PVPSession, interaction: discord.Interaction):
         embed=discord.Embed(title="⚔️ Đang vào trận...", color=PVP_COLOR)
     )
     await _post_panel(battle)
+    # Preview đội hình (confirm_msgs) được GIỮ LẠI xuyên suốt trận đấu,
+    # chỉ bị xóa khi trận kết thúc (xem _finish_battle).
     await _ephemerals.flush()
 
 
@@ -608,24 +610,23 @@ async def _after_action(battle: BattleSession):
     if w is not False:
         await _finish_battle(battle, w)
         return
-    active = battle._active_team()
-    finished_turn = False
-    if not battle.available_chars(active):
-        battle.end_rotation()
-        finished_turn = True
+    # Xen kẽ: sau MỖI hành động đơn lẻ, đổi lượt sang bên đối diện —
+    # trừ khi thẻ vừa dùng skill còn nợ 1 hành động (pending), lúc đó
+    # vẫn giữ lượt cho team đó để đánh nốt.
+    new_round = battle.advance_turn()
     await _post_panel(battle)
-    if finished_turn and battle.log:
+    if new_round and battle.log:
         await _notify_turn_log(battle)
 
 
 async def _notify_turn_log(battle: BattleSession):
-    """Gửi thông báo riêng tóm tắt diễn biến của lượt vừa kết thúc."""
+    """Gửi thông báo riêng tóm tắt diễn biến của vòng vừa kết thúc."""
     if battle.done or not battle.channel or not battle.log:
         return
     try:
         log = battle.log
         e = discord.Embed(
-            title=f"📜 Diễn biến lượt {battle.round - 1}",
+            title=f"📜 Diễn biến vòng {battle.round - 1}",
             color=PVP_COLOR,
         )
         e.set_author(name="Chị Cá 🐟 PvP")
