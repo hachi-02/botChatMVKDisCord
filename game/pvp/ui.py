@@ -39,6 +39,7 @@ class PVPSession:
         self.a_cards = None
         self.b_cards = None
         self.done = False
+        self.select_msgs = []
 
 
 def _bar(done, total, size=10):
@@ -136,6 +137,11 @@ class TeamSelectView(discord.ui.View):
         if self.side == "A":
             await _begin_selection(interaction, self.session, "B")
         else:
+            for m in self.session.select_msgs:
+                try:
+                    await m.delete()
+                except Exception:
+                    pass
             await _resolve(self.session, interaction)
 
 
@@ -162,9 +168,10 @@ async def _begin_selection(interaction, session: PVPSession, side: str):
         for c in cards
     ]
     view = TeamSelectView(session, side, options, max_pick)
-    await interaction.followup.send(
+    msg = await interaction.followup.send(
         f"{user.mention} chọn **{max_pick}** thẻ để lập đội:", view=view
     )
+    session.select_msgs.append(msg)
 
 
 # ====================== BATTLE (team rotation + SP) ======================
