@@ -66,6 +66,13 @@ def _compute_damage(attacker: Fighter, defender: Fighter, mult: float):
     return dmg, crit
 
 
+def _lowest_alive(team: list):
+    alive = [f for f in team if f.alive]
+    if not alive:
+        return None
+    return min(alive, key=lambda f: f.hp / f.max_hp)
+
+
 def _apply_effect(caster: Fighter, team: list, enemy: list, eff: dict, log: list, target=None):
     t = eff["type"]
     p = eff.get("power", 0)
@@ -85,10 +92,11 @@ def _apply_effect(caster: Fighter, team: list, enemy: list, eff: dict, log: list
             ally.shield = max(ally.shield, p)
         log.append(f"{tag}: toàn đội giáp giảm {int(p*100)}% 🛡️")
     elif t == "HEAL":
-        low = min((f for f in team if f.alive), key=lambda f: f.hp / f.max_hp)
-        before = low.hp
-        low.hp = min(low.max_hp, low.hp + p)
-        log.append(f"{tag}: hồi {low.hp - before} HP cho {low.name} 💚")
+        low = _lowest_alive(team)
+        if low is not None:
+            before = low.hp
+            low.hp = min(low.max_hp, low.hp + p)
+            log.append(f"{tag}: hồi {low.hp - before} HP cho {low.name} 💚")
     elif t == "BUFF_ATK":
         for ally in team:
             ally.atk_buff += p
@@ -108,25 +116,32 @@ def _apply_effect(caster: Fighter, team: list, enemy: list, eff: dict, log: list
     elif t == "SHIELD_HEAL":
         for ally in team:
             ally.shield = max(ally.shield, p)
-        low = min((f for f in team if f.alive), key=lambda f: f.hp / f.max_hp)
-        before = low.hp
-        low.hp = min(low.max_hp, low.hp + p2)
-        log.append(f"{tag}: giáp {int(p*100)}% + hồi {low.hp - before} HP cho {low.name} 🛡️💚")
+        low = _lowest_alive(team)
+        heal_txt = ""
+        if low is not None:
+            before = low.hp
+            low.hp = min(low.max_hp, low.hp + p2)
+            heal_txt = f" + hồi {low.hp - before} HP cho {low.name}"
+        log.append(f"{tag}: giáp {int(p*100)}%{heal_txt} 🛡️💚")
     elif t == "HEAL_ST_DMG":
-        low = min((f for f in team if f.alive), key=lambda f: f.hp / f.max_hp)
-        before = low.hp
-        low.hp = min(low.max_hp, low.hp + p)
-        log.append(f"{tag}: hồi {low.hp - before} HP cho {low.name} 💚")
+        low = _lowest_alive(team)
+        if low is not None:
+            before = low.hp
+            low.hp = min(low.max_hp, low.hp + p)
+            log.append(f"{tag}: hồi {low.hp - before} HP cho {low.name} 💚")
         if target and target.alive:
             dmg, crit = _compute_damage(caster, target, p2)
             log.append(f"{tag}: {target.name} -{dmg} HP{' 💥' if crit else ''}")
     elif t == "HEAL_BUFF":
-        low = min((f for f in team if f.alive), key=lambda f: f.hp / f.max_hp)
-        before = low.hp
-        low.hp = min(low.max_hp, low.hp + p)
+        low = _lowest_alive(team)
+        heal_txt = ""
+        if low is not None:
+            before = low.hp
+            low.hp = min(low.max_hp, low.hp + p)
+            heal_txt = f"hồi {low.hp - before} HP cho {low.name} + "
         for ally in team:
             ally.atk_buff += p2
-        log.append(f"{tag}: hồi {low.hp - before} HP + toàn đội +{int(p2*100)}% ATK 💚⬆️")
+        log.append(f"{tag}: {heal_txt}toàn đội +{int(p2*100)}% ATK 💚⬆️")
 
 
 def _basic_attack(attacker: Fighter, target: Fighter, log: list):
@@ -199,6 +214,13 @@ class BattleSession:
         self.acted = set()
         self.round += 1
         self._start_rotation(self._active_team())
+
+    def end_turn(self):
+        """Kết thúc lượt sớm (skip) — bỏ qua các thẻ chưa hành động, không cộng SP."""
+        if self.done:
+            return False
+        self.end_rotation()
+        return True
 
     def apply_action(self, actor: Fighter, action: str, target: Fighter) -> bool:
         team = self._team_of(actor)

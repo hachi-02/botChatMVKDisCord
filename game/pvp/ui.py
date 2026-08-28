@@ -173,39 +173,47 @@ class ControlPanelView(discord.ui.View):
         team = battle._active_team()
         chars = battle.available_chars(team)
         enemies = [f for f in battle._enemy_of(team[0]) if f.alive] if team else []
-        self.char_select = discord.ui.Select(
-            placeholder="① Chọn thẻ hành động",
-            min_values=1, max_values=1,
-            options=[discord.SelectOption(
-                label=f["name"], value=f["key"],
-                description=f"{ROLE_LABEL[f['role']]} • {f['element']}",
-                emoji=ELEMENT_EMOJI.get(f["element"], "❔"),
-            ) for f in chars],
-        )
-        self.char_select.callback = self._noop
-        self.target_select = discord.ui.Select(
-            placeholder="② Chọn mục tiêu địch",
-            min_values=1, max_values=1,
-            options=[discord.SelectOption(
-                label=e["name"], value=e["key"],
-                description=f"{ROLE_LABEL[e['role']]} • {e['element']}",
-                emoji=ELEMENT_EMOJI.get(e["element"], "❔"),
-            ) for e in enemies],
-        )
-        self.target_select.callback = self._noop
-        self.add_item(self.char_select)
-        self.add_item(self.target_select)
+        self._add_selects(chars, enemies)
 
         sp = battle.sp_a if battle.active_team == "A" else battle.sp_b
         self.btn_normal = discord.ui.Button(label="⚔️ Đánh thường", style=discord.ButtonStyle.secondary)
         self.btn_skill = discord.ui.Button(label="🔥 Skill", style=discord.ButtonStyle.primary, disabled=(sp <= 0))
         self.btn_ult = discord.ui.Button(label="✨ Ultimate", style=discord.ButtonStyle.danger)
+        self.btn_skip = discord.ui.Button(label="⏭️ Kết thúc lượt", style=discord.ButtonStyle.secondary)
         self.btn_normal.callback = lambda i: self._act(i, "normal")
         self.btn_skill.callback = lambda i: self._act(i, "skill")
         self.btn_ult.callback = lambda i: self._act(i, "ultimate")
+        self.btn_skip.callback = self._skip
+        self.add_item(self.btn_skip)
         self.add_item(self.btn_normal)
         self.add_item(self.btn_skill)
         self.add_item(self.btn_ult)
+
+    def _add_selects(self, chars: list, enemies: list):
+        if chars:
+            self.char_select = discord.ui.Select(
+                placeholder="① Chọn thẻ hành động",
+                min_values=1, max_values=1,
+                options=[discord.SelectOption(
+                    label=f["name"], value=f["key"],
+                    description=f"{ROLE_LABEL[f['role']]} • {f['element']}",
+                    emoji=ELEMENT_EMOJI.get(f["element"], "❔"),
+                ) for f in chars],
+            )
+            self.char_select.callback = self._noop
+            self.add_item(self.char_select)
+        if enemies:
+            self.target_select = discord.ui.Select(
+                placeholder="② Chọn mục tiêu địch",
+                min_values=1, max_values=1,
+                options=[discord.SelectOption(
+                    label=e["name"], value=e["key"],
+                    description=f"{ROLE_LABEL[e['role']]} • {e['element']}",
+                    emoji=ELEMENT_EMOJI.get(e["element"], "❔"),
+                ) for e in enemies],
+            )
+            self.target_select.callback = self._noop
+            self.add_item(self.target_select)
 
     async def _noop(self, interaction: discord.Interaction):
         await interaction.response.defer()
@@ -213,9 +221,22 @@ class ControlPanelView(discord.ui.View):
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         return interaction.user.id == self.battle._owner_active().id
 
+    async def _skip(self, interaction: discord.Interaction):
+        battle = self.battle
+        if battle.done:
+            return
+        battle.end_turn()
+        for it in self.children:
+            it.disabled = True
+        await interaction.response.edit_message(view=self)
+        self.stop()
+        await _after_action(battle)
+
     async def _act(self, interaction: discord.Interaction, action: str):
         battle = self.battle
-        char_key = self.char_select.values[0] if self.char_select.values else None
+        char_select = getattr(self, "char_select", None)
+        target_select = getattr(self, "target_select", None)
+        char_key = char_select.values[0] if (char_select and char_select.values) else None
         if char_key is None:
             await interaction.response.send_message("Hãy chọn ① thẻ hành động!", ephemeral=True)
             return
@@ -228,7 +249,7 @@ class ControlPanelView(discord.ui.View):
         needs_target = action == "normal" or (eff is not None and eff["type"] in ("ST_DMG", "STUN", "HEAL_ST_DMG"))
         target = None
         if needs_target:
-            tkey = self.target_select.values[0] if self.target_select.values else None
+            tkey = target_select.values[0] if (target_select and target_select.values) else None
             if tkey is None:
                 await interaction.response.send_message("Hãy chọn ② mục tiêu địch!", ephemeral=True)
                 return
