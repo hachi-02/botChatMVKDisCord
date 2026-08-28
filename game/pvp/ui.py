@@ -91,6 +91,7 @@ class PVPSession:
         self.cancelled = False
         self.select_msgs = []
         self.confirm_msgs = []
+        self.announce_msgs = []
 
     def user_for_side(self, side: str):
         if side == "A":
@@ -121,6 +122,11 @@ def _release_session(session):
 
 async def _cancel_team_select(session):
     for m in session.select_msgs:
+        try:
+            await m.delete()
+        except Exception:
+            pass
+    for m in session.announce_msgs:
         try:
             await m.delete()
         except Exception:
@@ -181,17 +187,15 @@ class ChallengeView(discord.ui.View):
         self.session.first_user = first
         self.session.second_user = second
         await interaction.response.edit_message(
-            content=(
-                f"✅ {self.session.target.mention} đã chấp nhận!\n"
-                f"🎲 **{first.display_name}** được chọn đi trước."
-            ),
+            content=f"✅ {self.session.target.mention} đã chấp nhận!",
             view=self,
         )
         self.stop()
-        await interaction.followup.send(
+        announce = await interaction.followup.send(
             f"🎲 Xúc xắc: {first.mention} **đi trước**, "
             f"{second.mention} đi sau.\nTiếp theo: chọn đội hình!"
         )
+        self.session.announce_msgs.append(announce)
         await _begin_selection(interaction, self.session, "A")
 
     @discord.ui.button(label="❌ Từ chối", style=discord.ButtonStyle.danger)
@@ -265,6 +269,11 @@ class TeamSelectView(discord.ui.View):
             else session.challenger
         )
         for m in session.select_msgs:
+            try:
+                await m.delete()
+            except Exception:
+                pass
+        for m in session.announce_msgs:
             try:
                 await m.delete()
             except Exception:
@@ -584,6 +593,7 @@ async def _resolve(session: PVPSession, interaction: discord.Interaction):
         interaction.channel, interaction.client,
     )
     battle.confirm_msgs = session.confirm_msgs
+    battle.announce_msgs = session.announce_msgs
     anim = discord.Embed(title="⚔️ Bắt đầu!", color=PVP_COLOR)
     anim.set_image(url=PVP_BATTLE_ANIM_GIF)
     anim_msg = await interaction.followup.send(embed=anim)
@@ -683,6 +693,11 @@ async def _finish_battle(battle: BattleSession, winner, surrender: bool = False)
             await m.delete()
         except Exception:
             pass
+    for m in getattr(battle, "announce_msgs", []):
+        try:
+            await m.delete()
+        except Exception:
+            pass
     ra_row = await get_pvp_rating(battle.a_user.id)
     rb_row = await get_pvp_rating(battle.b_user.id)
     ra = ra_row["rating"]
@@ -720,7 +735,7 @@ async def _finish_battle(battle: BattleSession, winner, surrender: bool = False)
         print("LỖI FINISH_BATTLE:", e, flush=True)
     if battle.message is not None:
         try:
-            await battle.message.edit(view=None)
+            await battle.message.delete()
         except Exception:
             pass
 
