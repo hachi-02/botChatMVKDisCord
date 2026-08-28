@@ -507,36 +507,66 @@ def _team_preview_embed(user, cards):
     return e
 
 
-def _team_battle_lines(team, battle):
-    lines = []
-    for f in team:
-        mark = "💀" if not f.alive else ("✅" if f.turn_done else ("⭐" if f.stunned else "❤️"))
-        if not f.alive:
-            lines.append(f"💀 {f.name}")
-            continue
-        pending_txt = " • ↻ còn 1 hành động" if f.pending else ""
-        lines.append(
-            f"{mark} {ELEMENT_EMOJI.get(f.element,'❔')} **{f.name}** [{ROLE_LABEL[f.role]}]\n"
-            f"{_bar(max(0,f.hp), f.max_hp)} {max(0,f.hp)}/{f.max_hp}\n"
-            f"⚡{f.energy}/{PVP_ENERGY_MAX}{' 🛡️' if f.shield > 0 else ''}{pending_txt}"
-        )
+def _sp_of_team(battle, team):
+    return battle.sp_a if team == "A" else battle.sp_b
+
+
+def _fighter_status_mark(f):
+    if not f.alive:
+        return "💀"
+    if f.stunned:
+        return "⭐"
+    if f.turn_done:
+        return "✅"
+    return "❤️"
+
+
+def _fighter_field(e, f):
+    mark = _fighter_status_mark(f)
+    badge = f"{ELEMENT_EMOJI.get(f.element,'❔')}"
+    e.add_field(
+        name=f"{mark} {badge} {f.name}",
+        value=_fighter_card_value(f),
+        inline=True,
+    )
+
+
+def _fighter_card_value(f):
+    if not f.alive:
+        return "Đã hạ gục"
+    lines = [f"{_bar(max(0, f.hp), f.max_hp)} {max(0,f.hp)}/{f.max_hp}"]
+    extras = [f"⚡{f.energy}/{PVP_ENERGY_MAX}"]
+    if f.shield > 0:
+        extras.append(f"🛡️{f.shield}")
+    if f.pending:
+        extras.append("↻\u00a01 hành động")
+    lines.append(" ".join(extras))
     return "\n".join(lines)
 
 
 def _battle_embed(battle: BattleSession):
-    e = discord.Embed(title=f"⚔️ PvP — Lượt {battle._owner_active().display_name}", color=PVP_COLOR)
+    owner = battle._owner_active()
+    e = discord.Embed(title=f"⚔️ PvP — Lượt {owner.display_name}", color=PVP_COLOR)
     e.set_author(name="Chị Cá 🐟 PvP")
+    try:
+        e.set_thumbnail(url=owner.display_avatar.url)
+    except Exception:
+        pass
     sp = battle.sp_a if battle.active_team == "A" else battle.sp_b
     e.add_field(
         name=f"🔵 {battle.a_user.display_name}",
-        value=_team_battle_lines(battle.team_a, battle),
-        inline=True,
+        value=f"🔋 SP {_sp_of_team(battle, 'A')}/{PVP_SP_MAX}",
+        inline=False,
     )
+    for f in battle.team_a:
+        _fighter_field(e, f)
     e.add_field(
         name=f"🔴 {battle.b_user.display_name}",
-        value=_team_battle_lines(battle.team_b, battle),
-        inline=True,
+        value=f"🔋 SP {_sp_of_team(battle, 'B')}/{PVP_SP_MAX}",
+        inline=False,
     )
+    for f in battle.team_b:
+        _fighter_field(e, f)
     e.add_field(
         name="🎯 Đến lượt",
         value=f"{battle._owner_active().mention} — 🔋 SP {sp}/{PVP_SP_MAX}\n"
