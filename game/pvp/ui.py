@@ -532,8 +532,7 @@ def _team_preview_cards(user, cards) -> list:
             e.set_thumbnail(url=c["url"])
         except Exception:
             pass
-        e.add_field(name="❤️ HP", value=str(c["hp"]), inline=True)
-        e.add_field(name="⚔️ ATK", value=str(c["atk"]), inline=True)
+        e.add_field(name=f"❤️ HP: {c['hp']} · ⚔️ ATK: {c['atk']}", value="\u200b", inline=False)
         e.add_field(name=f"🔥 Skill · {c['skill']['name']}", value=_effect_desc(c["skill"]), inline=False)
         e.add_field(name=f"✨ Ultimate · {c['ultimate']['name']}", value=_effect_desc(c["ultimate"]), inline=False)
         embeds.append(e)
