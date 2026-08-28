@@ -171,7 +171,8 @@ class ControlPanelView(discord.ui.View):
         super().__init__(timeout=PVP_TURN_TIMEOUT)
         self.battle = battle
         team = battle._active_team()
-        chars = battle.available_chars(team)
+        pending = battle.pending_actor(team)
+        chars = [pending] if pending else battle.available_chars(team)
         enemies = [f for f in battle._enemy_of(team[0]) if f.alive] if team else []
         self._add_selects(chars, enemies)
 
@@ -179,15 +180,16 @@ class ControlPanelView(discord.ui.View):
         self.btn_normal = discord.ui.Button(label="⚔️ Đánh thường", style=discord.ButtonStyle.secondary)
         self.btn_skill = discord.ui.Button(label="🔥 Skill", style=discord.ButtonStyle.primary, disabled=(sp <= 0))
         self.btn_ult = discord.ui.Button(label="✨ Ultimate", style=discord.ButtonStyle.danger)
-        self.btn_skip = discord.ui.Button(label="⏭️ Kết thúc lượt", style=discord.ButtonStyle.secondary)
         self.btn_normal.callback = lambda i: self._act(i, "normal")
         self.btn_skill.callback = lambda i: self._act(i, "skill")
         self.btn_ult.callback = lambda i: self._act(i, "ultimate")
-        self.btn_skip.callback = self._skip
-        self.add_item(self.btn_skip)
         self.add_item(self.btn_normal)
         self.add_item(self.btn_skill)
         self.add_item(self.btn_ult)
+        if pending is not None:
+            self.btn_skip_pending = discord.ui.Button(label="⏭️ Bỏ đánh thường", style=discord.ButtonStyle.secondary)
+            self.btn_skip_pending.callback = self._skip_pending
+            self.add_item(self.btn_skip_pending)
 
     def _add_selects(self, chars: list, enemies: list):
         if chars:
@@ -221,11 +223,14 @@ class ControlPanelView(discord.ui.View):
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         return interaction.user.id == self.battle._owner_active().id
 
-    async def _skip(self, interaction: discord.Interaction):
+    async def _skip_pending(self, interaction: discord.Interaction):
         battle = self.battle
         if battle.done:
             return
-        battle.end_turn()
+        team = battle._active_team()
+        actor = battle.pending_actor(team)
+        if actor is not None:
+            battle.skip_pending(actor)
         for it in self.children:
             it.disabled = True
         await interaction.response.edit_message(view=self)
@@ -241,7 +246,7 @@ class ControlPanelView(discord.ui.View):
             await interaction.response.send_message("Hãy chọn ① thẻ hành động!", ephemeral=True)
             return
         actor = next((f for f in battle._active_team() if f.key == char_key), None)
-        if actor is None or not actor.alive or actor.key in battle.acted or actor.stunned:
+        if actor is None or not actor.alive or actor.turn_done or actor.stunned:
             await interaction.response.send_message("Thẻ không hợp lệ!", ephemeral=True)
             return
 
@@ -265,8 +270,10 @@ class ControlPanelView(discord.ui.View):
         if action == "ultimate" and actor.energy < PVP_ENERGY_MAX:
             await interaction.response.send_message("Chưa đủ energy Ultimate! ⚡", ephemeral=True)
             return
+        if not battle.apply_action(actor, action, target):
+            await interaction.response.send_message("Không thể thực hiện hành động này!", ephemeral=True)
+            return
 
-        battle.apply_action(actor, action, target)
         for it in self.children:
             it.disabled = True
         await interaction.response.edit_message(view=self)
@@ -277,14 +284,22 @@ class ControlPanelView(discord.ui.View):
         if self.battle.done:
             return
         team = self.battle._active_team()
-        chars = self.battle.available_chars(team)
-        if not chars:
-            await _after_action(self.battle)
-            return
-        actor = chars[0]
-        enemies = [e for e in self.battle._enemy_of(actor) if e.alive]
-        target = enemies[0] if enemies else None
-        self.battle.apply_action(actor, "normal", target)
+        pending = self.battle.pending_actor(team)
+        if pending is not None:
+            actor = pending
+            enemies = [e for e in self.battle._enemy_of(actor) if e.alive]
+            target = enemies[0] if enemies else None
+            if not self.battle.apply_action(actor, "normal", target):
+                self.battle.skip_pending(actor)
+        else:
+            chars = self.battle.available_chars(team)
+            if not chars:
+                await _after_action(self.battle)
+                return
+            actor = chars[0]
+            enemies = [e for e in self.battle._enemy_of(actor) if e.alive]
+            target = enemies[0] if enemies else None
+            self.battle.apply_action(actor, "normal", target)
         for it in self.children:
             it.disabled = True
         await _after_action(self.battle)
@@ -396,14 +411,15 @@ def _team_preview_embed(user, cards):
 def _team_battle_lines(team, battle):
     lines = []
     for f in team:
-        mark = "💀" if not f.alive else ("✅" if f.key in battle.acted else ("⭐" if f.stunned else "❤️"))
+        mark = "💀" if not f.alive else ("✅" if f.turn_done else ("⭐" if f.stunned else "❤️"))
         if not f.alive:
             lines.append(f"💀 {f.name}")
             continue
+        pending_txt = " • ↻ còn 1 hành động" if f.pending else ""
         lines.append(
             f"{mark} {ELEMENT_EMOJI.get(f.element,'❔')} **{f.name}** [{ROLE_LABEL[f.role]}]\n"
             f"{_bar(max(0,f.hp), f.max_hp)} {max(0,f.hp)}/{f.max_hp}\n"
-            f"⚡{f.energy}/{PVP_ENERGY_MAX}{' 🛡️' if f.shield > 0 else ''}"
+            f"⚡{f.energy}/{PVP_ENERGY_MAX}{' 🛡️' if f.shield > 0 else ''}{pending_txt}"
         )
     return "\n".join(lines)
 

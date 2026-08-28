@@ -26,6 +26,8 @@ class Fighter:
         self.def_debuff = 0.0
         self.shield = 0.0
         self.stunned = False
+        self.turn_done = False
+        self.pending = False
 
     @property
     def alive(self) -> bool:
@@ -170,7 +172,6 @@ class BattleSession:
         self.channel = channel
         self.bot = bot
         self.active_team = "A"
-        self.acted = set()
         self.sp_a = PVP_SP_START
         self.sp_b = PVP_SP_START
         self.round = 1
@@ -198,7 +199,14 @@ class BattleSession:
             self.sp_b = val
 
     def available_chars(self, team):
-        return [f for f in team if f.alive and f.key not in self.acted and not f.stunned]
+        return [f for f in team if f.alive and not f.turn_done and not f.stunned]
+
+    def pending_actor(self, team):
+        """Thẻ đang chờ hành động nốt (vừa dùng skill) — nếu có thì phải xong thẻ này trước."""
+        for f in team:
+            if f.alive and f.pending and not f.turn_done:
+                return f
+        return None
 
     def _start_rotation(self, team):
         if any(f.alive and f.role == "SUP" for f in team):
@@ -211,39 +219,52 @@ class BattleSession:
         for f in self._active_team():
             f.stunned = False
         self.active_team = "B" if self.active_team == "A" else "A"
-        self.acted = set()
+        for f in self._active_team():
+            f.turn_done = False
+            f.pending = False
         self.round += 1
         self._start_rotation(self._active_team())
-
-    def end_turn(self):
-        """Kết thúc lượt sớm (skip) — bỏ qua các thẻ chưa hành động, không cộng SP."""
-        if self.done:
-            return False
-        self.end_rotation()
-        return True
 
     def apply_action(self, actor: Fighter, action: str, target: Fighter) -> bool:
         team = self._team_of(actor)
         enemy = self._enemy_of(actor)
         sp = self._sp_of(actor)
+        if actor.turn_done:
+            return False
         if action == "normal":
+            if self.pending_actor(team) is not None and not actor.pending:
+                return False
             _basic_attack(actor, target, self.log)
             sp = min(PVP_SP_MAX, sp + 1)
+            actor.turn_done = True
+            actor.pending = False
         elif action == "skill":
-            if sp <= 0:
+            if actor.pending or sp <= 0:
                 return False
             _apply_effect(actor, team, enemy, actor.skill, self.log, target)
             actor.gain_energy(30)
             sp -= 1
+            actor.pending = True
         elif action == "ultimate":
+            if self.pending_actor(team) is not None and not actor.pending:
+                return False
             if actor.energy < PVP_ENERGY_MAX:
                 return False
             _apply_effect(actor, team, enemy, actor.ultimate, self.log, target)
             actor.energy = 0
+            actor.turn_done = True
+            actor.pending = False
         else:
             return False
         self._set_sp(actor, sp)
-        self.acted.add(actor.key)
+        return True
+
+    def skip_pending(self, actor: Fighter) -> bool:
+        """Bỏ qua hành động còn lại của thẻ vừa dùng skill — hoàn tất thẻ đó."""
+        if actor.turn_done or not actor.pending:
+            return False
+        actor.turn_done = True
+        actor.pending = False
         return True
 
     def _team_of(self, fighter: Fighter):
