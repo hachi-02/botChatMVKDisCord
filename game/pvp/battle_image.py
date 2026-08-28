@@ -53,12 +53,18 @@ def _bar(draw, x, y, w, h, pct, color, bg=(20, 22, 30)):
         draw.rounded_rectangle((x, y, x + w * min(pct, 1.0), y + h), radius=h // 2, fill=color)
 
 
-def _normalize(im: Image.Image) -> Image.Image:
+def _normalize(im: Image.Image, top_bias: float = 0.15) -> Image.Image:
+    """
+    top_bias: 0 = crop sát top (giữ đầu tối đa), 
+              0.5 = crop giữa (mặc định cũ),
+              tăng dần thì crop dịch xuống dưới.
+    """
     im = im.convert("RGBA")
     w, h = im.size
     s = min(w, h)
     l = (w - s) // 2
-    t = (h - s) // 2
+    max_t = h - s
+    t = int(max_t * top_bias)          
     return im.crop((l, t, l + s, t + s))
 
 
@@ -68,7 +74,7 @@ def _portrait(url: str, dead: bool) -> Image.Image:
         base = Image.new("RGBA", (PORTRAIT, PORTRAIT), (60, 64, 82, 255))
         _text(ImageDraw.Draw(base), (PORTRAIT // 2, PORTRAIT // 2), "?", 60, MUTED, anchor="mm")
         return base
-    im = _normalize(raw).resize((PORTRAIT, PORTRAIT))
+    im = _normalize(raw, top_bias=0.15).resize((PORTRAIT, PORTRAIT))   # <-- thêm top_bias
     if dead:
         im = im.convert("L").convert("RGBA")
     return im
@@ -79,11 +85,11 @@ def _draw_card(img, draw, row_y, fighter, team_color, side):
     # side == "R": thông tin trái (right-aligned), portrait phải
     if side == "L":
         rect = (36, row_y, 566, row_y + 236)
-        px, py = row_y + (236 - PORTRAIT) // 2 + 10, row_y + 14
+        px, py = 52, row_y + 14
         info_x = 272
     else:
         rect = (834, row_y, 1364, row_y + 236)
-        px, py = row_y + (236 - PORTRAIT) // 2 + 10, row_y + 14
+        px, py = 1148, row_y + 14
         info_x = 1132
 
     border = (255, 210, 80) if fighter.stunned and fighter.alive else team_color
