@@ -113,12 +113,6 @@ async def _cancel_team_select(session):
             await m.delete()
         except Exception:
             pass
-    for m in session.confirm_msgs:
-        try:
-            await m.delete()
-        except Exception:
-            pass
-    session.confirm_msgs.clear()
     await _ephemerals.flush()
     try:
         await session.channel.send(
@@ -562,6 +556,7 @@ async def _resolve(session: PVPSession, interaction: discord.Interaction):
         session.challenger, session.target,
         interaction.channel, interaction.client,
     )
+    battle.confirm_msgs = session.confirm_msgs
     anim = discord.Embed(title="⚔️ Bắt đầu!", color=PVP_COLOR)
     anim.set_image(url=PVP_BATTLE_ANIM_GIF)
     anim_msg = await interaction.followup.send(embed=anim)
@@ -661,6 +656,11 @@ async def _finish_battle(battle: BattleSession, winner, surrender: bool = False)
         except Exception:
             pass
     battle.turn_log_msgs.clear()
+    for m in getattr(battle, "confirm_msgs", []):
+        try:
+            await m.delete()
+        except Exception:
+            pass
     ra_row = await get_pvp_rating(battle.a_user.id)
     rb_row = await get_pvp_rating(battle.b_user.id)
     ra = ra_row["rating"]
