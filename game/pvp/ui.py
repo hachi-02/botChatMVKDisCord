@@ -47,6 +47,10 @@ def _bar(done, total, size=10):
     return "▰" * filled + "▱" * (size - filled)
 
 
+def _signed(delta):
+    return f"+{delta}" if delta >= 0 else str(delta)
+
+
 def _challenge_key(a, b):
     return frozenset((a, b))
 
@@ -484,15 +488,15 @@ async def _finish_battle(battle: BattleSession, winner, surrender: bool = False)
         na, nb = compute_elo_draw(ra, rb)
         win_user, lose_user = None, None
         draw = True
-    await update_pvp_result(battle.a_user.id, battle.b_user.id, na, nb, draw)
 
-    result = {
-        "winner": winner,
-        "log": battle.log,
-        "team_a": battle.team_a,
-        "team_b": battle.team_b,
-    }
-    embed = _result_embed(battle, result, ra, rb, na, nb, win_user, lose_user, draw, surrender)
+    if draw:
+        await update_pvp_result(battle.a_user.id, battle.b_user.id, na, nb, draw)
+    else:
+        w_new = nb if win_user.id == battle.b_user.id else na
+        l_new = nb if lose_user.id == battle.b_user.id else na
+        await update_pvp_result(win_user.id, lose_user.id, w_new, l_new, draw)
+
+    embed = _result_embed(battle, ra, na, rb, nb, win_user, lose_user, draw, surrender)
     try:
         await battle.message.edit(embed=embed, view=None)
     except Exception as e:
@@ -621,7 +625,7 @@ def _battle_embed(battle: BattleSession):
     return e
 
 
-def _result_embed(battle, result, ra, rb, na, nb, win_user, lose_user, draw, surrender=False):
+def _result_embed(battle, a_old, a_new, b_old, b_new, win_user, lose_user, draw, surrender=False):
     if draw:
         title = "🤝 ĐÃ HÒA!"
         color = 0x95A5A6
@@ -636,32 +640,36 @@ def _result_embed(battle, result, ra, rb, na, nb, win_user, lose_user, draw, sur
     if surrender and lose_user is not None:
         e.description = f"🏳️ {lose_user.mention} đã đầu hàng."
 
-    if not draw:
-        delta_a = na - ra
-        delta_b = nb - rb
+    if draw:
         e.add_field(
-            name=f"🏆 {win_user.display_name} (+{delta_a})",
-            value=f"Bậc rank **{ra} → {na}**",
+            name=f"🔵 {battle.a_user.display_name} ({_signed(a_new - a_old)})",
+            value=f"Bậc rank **{a_old} → {a_new}**",
             inline=True,
         )
         e.add_field(
-            name=f"💀 {lose_user.display_name} ({delta_b})",
-            value=f"Bậc rank **{rb} → {nb}**",
-            inline=True,
-        )
-        e.set_footer(text=f"🎉 Chúc mừng {win_user.display_name} chiến thắng!")
-    else:
-        e.add_field(
-            name=f"🔵 {battle.a_user.display_name}",
-            value=f"Bậc rank **{ra} → {na}**",
-            inline=True,
-        )
-        e.add_field(
-            name=f"🔴 {battle.b_user.display_name}",
-            value=f"Bậc rank **{rb} → {nb}**",
+            name=f"🔴 {battle.b_user.display_name} ({_signed(b_new - b_old)})",
+            value=f"Bậc rank **{b_old} → {b_new}**",
             inline=True,
         )
         e.set_footer(text="Hòa, không đổi rank")
+        return e
+
+    if win_user.id == battle.a_user.id:
+        w_old, w_new, l_old, l_new = a_old, a_new, b_old, b_new
+    else:
+        w_old, w_new, l_old, l_new = b_old, b_new, a_old, a_new
+
+    e.add_field(
+        name=f"🏆 {win_user.display_name} ({_signed(w_new - w_old)})",
+        value=f"Bậc rank **{w_old} → {w_new}**",
+        inline=True,
+    )
+    e.add_field(
+        name=f"💀 {lose_user.display_name} ({_signed(l_new - l_old)})",
+        value=f"Bậc rank **{l_old} → {l_new}**",
+        inline=True,
+    )
+    e.set_footer(text=f"🎉 Chúc mừng {win_user.display_name} chiến thắng!")
     return e
 
 
