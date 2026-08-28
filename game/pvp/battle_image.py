@@ -79,11 +79,11 @@ def _draw_card(img, draw, row_y, fighter, team_color, side):
     # side == "R": thông tin trái (right-aligned), portrait phải
     if side == "L":
         rect = (36, row_y, 566, row_y + 236)
-        px, py = 52, row_y + 14
+        px, py = 52, row_y + 4
         info_x = 272
     else:
         rect = (834, row_y, 1364, row_y + 236)
-        px, py = 1148, row_y + 14
+        px, py = 1148, row_y + 4
         info_x = 1132
 
     border = (255, 210, 80) if fighter.stunned and fighter.alive else team_color
