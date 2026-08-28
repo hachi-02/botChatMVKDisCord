@@ -34,6 +34,44 @@ pending_challenges = set()
 active_players = set()
 
 
+class _EphemeralStore:
+    def __init__(self):
+        self._msgs = set()
+
+    async def send(self, interaction, content, seconds=5):
+        try:
+            await interaction.response.send_message(content, ephemeral=True)
+        except Exception:
+            return None
+        try:
+            msg = await interaction.original_response()
+        except Exception:
+            return None
+        if msg is not None:
+            self._msgs.add(msg)
+            asyncio.create_task(self._auto_delete(msg, seconds))
+        return msg
+
+    async def flush(self):
+        for msg in list(self._msgs):
+            try:
+                await msg.delete()
+            except Exception:
+                pass
+        self._msgs.clear()
+
+    async def _auto_delete(self, msg, seconds):
+        await asyncio.sleep(seconds)
+        self._msgs.discard(msg)
+        try:
+            await msg.delete()
+        except Exception:
+            pass
+
+
+_ephemerals = _EphemeralStore()
+
+
 class PVPSession:
     def __init__(self, challenger, target, channel):
         self.challenger = challenger
@@ -44,6 +82,7 @@ class PVPSession:
         self.done = False
         self.cancelled = False
         self.select_msgs = []
+        self.confirm_msgs = []
 
 
 def _bar(done, total, size=10):
@@ -73,6 +112,13 @@ async def _cancel_team_select(session):
             await m.delete()
         except Exception:
             pass
+    for m in session.confirm_msgs:
+        try:
+            await m.delete()
+        except Exception:
+            pass
+    session.confirm_msgs.clear()
+    await _ephemerals.flush()
     try:
         await session.channel.send(
             f"⏳ Hết giờ chọn đội, trận giữa "
@@ -107,8 +153,8 @@ class ChallengeView(discord.ui.View):
     @discord.ui.button(label="⚔️ Chấp nhận", style=discord.ButtonStyle.primary)
     async def accept(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user.id != self.session.target.id:
-            await interaction.response.send_message(
-                "Chỉ người được thách đấu mới được chấp nhận!", ephemeral=True
+            await _ephemerals.send(
+                interaction, "Chỉ người được thách đấu mới được chấp nhận!"
             )
             return
         if self.session.cancelled or interaction.user.id not in active_players \
@@ -129,8 +175,8 @@ class ChallengeView(discord.ui.View):
     @discord.ui.button(label="❌ Từ chối", style=discord.ButtonStyle.danger)
     async def decline(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user.id != self.session.target.id:
-            await interaction.response.send_message(
-                "Chỉ người được thách đấu mới được từ chối!", ephemeral=True
+            await _ephemerals.send(
+                interaction, "Chỉ người được thách đấu mới được từ chối!"
             )
             return
         if self.session.cancelled or self.session.done:
@@ -149,9 +195,7 @@ class ChallengeView(discord.ui.View):
     @discord.ui.button(label="🚫 Hủy", style=discord.ButtonStyle.danger)
     async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user.id != self.session.challenger.id:
-            await interaction.response.send_message(
-                "Chỉ người thách đấu mới được hủy!", ephemeral=True
-            )
+            await _ephemerals.send(interaction, "Chỉ người thách đấu mới được hủy!")
             return
         if self.session.cancelled or self.session.done:
             return
@@ -189,9 +233,7 @@ class TeamSelectView(discord.ui.View):
         if session.cancelled or session.done:
             return
         if interaction.user.id not in (session.challenger.id, session.target.id):
-            await interaction.response.send_message(
-                "Em không phải người trong trận!", ephemeral=True
-            )
+            await _ephemerals.send(interaction, "Em không phải người trong trận!")
             return
         session.cancelled = True
         _release_session(session)
@@ -229,9 +271,7 @@ class TeamSelectView(discord.ui.View):
             return
         expected = self.session.challenger.id if self.side == "A" else self.session.target.id
         if interaction.user.id != expected:
-            await interaction.response.send_message(
-                "Không phải lượt chọn của em!", ephemeral=True
-            )
+            await _ephemerals.send(interaction, "Không phải lượt chọn của em!")
             return
         vals = interaction.data.get("values", [])
         chosen = [get_card(v) for v in vals]
@@ -243,11 +283,12 @@ class TeamSelectView(discord.ui.View):
             item.disabled = True
         await interaction.response.edit_message(view=self)
         self.stop()
-        await interaction.followup.send(
+        conf = await interaction.followup.send(
             content=f"✅ {interaction.user.mention} đã chốt đội!",
             embeds=_team_preview_cards(interaction.user, chosen),
             ephemeral=True,
         )
+        self.session.confirm_msgs.append(conf)
         if self.side == "A":
             await _begin_selection(interaction, self.session, "B")
         else:
@@ -355,7 +396,10 @@ class ControlPanelView(discord.ui.View):
         await interaction.response.defer()
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        return interaction.user.id in (self.battle.a_user.id, self.battle.b_user.id)
+        if interaction.user.id in (self.battle.a_user.id, self.battle.b_user.id):
+            return True
+        await _ephemerals.send(interaction, "Em không phải người trong trận!")
+        return False
 
     async def _surrender(self, interaction: discord.Interaction):
         battle = self.battle
@@ -366,7 +410,7 @@ class ControlPanelView(discord.ui.View):
         elif interaction.user.id == battle.b_user.id:
             winner = "A"
         else:
-            await interaction.response.send_message("Em không phải người trong trận!", ephemeral=True)
+            await _ephemerals.send(interaction, "Em không phải người trong trận!")
             return
         for it in self.children:
             it.disabled = True
@@ -379,9 +423,7 @@ class ControlPanelView(discord.ui.View):
         if battle.done:
             return
         if interaction.user.id != battle._owner_active().id:
-            await interaction.response.send_message(
-                "⚠️ Không phải lượt của em!", ephemeral=True
-            )
+            await _ephemerals.send(interaction, "⚠️ Không phải lượt của em!")
             return
         team = battle._active_team()
         actor = battle.pending_actor(team)
@@ -396,48 +438,46 @@ class ControlPanelView(discord.ui.View):
     async def _act(self, interaction: discord.Interaction, action: str):
         battle = self.battle
         if interaction.user.id != battle._owner_active().id:
-            await interaction.response.send_message(
-                "⚠️ Không phải lượt của em!", ephemeral=True
-            )
+            await _ephemerals.send(interaction, "⚠️ Không phải lượt của em!")
             return
         char_select = getattr(self, "char_select", None)
         target_select = getattr(self, "target_select", None)
         char_key = char_select.values[0] if (char_select and char_select.values) else None
         if char_key is None:
-            await interaction.response.send_message(
-                "⚠️ Hãy chọn ① thẻ hành động trước khi bấm nút!", ephemeral=True
+            await _ephemerals.send(
+                interaction, "⚠️ Hãy chọn ① thẻ hành động trước khi bấm nút!"
             )
             return
         actor = next((f for f in battle._active_team() if f.key == char_key), None)
         if actor is None or not actor.alive:
-            await interaction.response.send_message(
-                "⚠️ Thẻ này đã bị hạ gục, không thể hành động!", ephemeral=True
+            await _ephemerals.send(
+                interaction, "⚠️ Thẻ này đã bị hạ gục, không thể hành động!"
             )
             return
         if actor.turn_done:
-            await interaction.response.send_message(
+            await _ephemerals.send(
+                interaction,
                 f"✅ {actor.name} đã kết thúc hành động trong lượt này, hãy chọn thẻ khác!",
-                ephemeral=True,
             )
             return
         if actor.stunned:
-            await interaction.response.send_message(
-                f"⭐ {actor.name} đang bị choáng, không thể hành động!", ephemeral=True
+            await _ephemerals.send(
+                interaction, f"⭐ {actor.name} đang bị choáng, không thể hành động!"
             )
             return
 
         pending = battle.pending_actor(battle._active_team())
         if pending is not None and pending is not actor:
-            await interaction.response.send_message(
+            await _ephemerals.send(
+                interaction,
                 f"🔒 {pending.name} vừa dùng skill và còn 1 hành động nữa — "
                 f"hãy đánh thường / ulti / bỏ đánh thường cho {pending.name} trước!",
-                ephemeral=True,
             )
             return
         if action == "skill" and actor.pending:
-            await interaction.response.send_message(
+            await _ephemerals.send(
+                interaction,
                 f"🔥 {actor.name} đã dùng skill rồi, hãy đánh thường, ulti hoặc bỏ đánh thường để hoàn tất!",
-                ephemeral=True,
             )
             return
 
@@ -447,36 +487,35 @@ class ControlPanelView(discord.ui.View):
         if needs_target:
             tkey = target_select.values[0] if (target_select and target_select.values) else None
             if tkey is None:
-                await interaction.response.send_message(
-                    "⚠️ Hãy chọn ② đối tượng (mục tiêu) để tấn công trước!",
-                    ephemeral=True,
+                await _ephemerals.send(
+                    interaction, "⚠️ Hãy chọn ② đối tượng (mục tiêu) để tấn công trước!"
                 )
                 return
             target = next((e for e in battle._enemy_of(actor) if e.key == tkey and e.alive), None)
             if target is None:
-                await interaction.response.send_message(
+                await _ephemerals.send(
+                    interaction,
                     "⚠️ Mục tiêu đã chọn không hợp lệ (có thể đã bị hạ gục)!",
-                    ephemeral=True,
                 )
                 return
 
         sp = battle._sp_of(actor)
         if action == "skill" and sp <= 0:
-            await interaction.response.send_message(
+            await _ephemerals.send(
+                interaction,
                 "🔥 Không đủ Skill Point để dùng skill! (hết SP, hãy đánh thường để nạp)",
-                ephemeral=True,
             )
             return
         if action == "ultimate" and actor.energy < PVP_ENERGY_MAX:
-            await interaction.response.send_message(
+            await _ephemerals.send(
+                interaction,
                 f"⚡ Không đủ năng lượng để dùng Ultimate! "
                 f"({actor.energy}/{PVP_ENERGY_MAX} — đánh thường hoặc skill để nạp)",
-                ephemeral=True,
             )
             return
         if not battle.apply_action(actor, action, target):
-            await interaction.response.send_message(
-                "⚠️ Không thể thực hiện hành động này!", ephemeral=True
+            await _ephemerals.send(
+                interaction, "⚠️ Không thể thực hiện hành động này!"
             )
             return
 
@@ -535,6 +574,13 @@ async def _resolve(session: PVPSession, interaction: discord.Interaction):
         embed=discord.Embed(title="⚔️ Đang vào trận...", color=PVP_COLOR)
     )
     await _post_panel(battle)
+    for m in session.confirm_msgs:
+        try:
+            await m.delete()
+        except Exception:
+            pass
+    session.confirm_msgs.clear()
+    await _ephemerals.flush()
 
 
 async def _post_panel(battle: BattleSession):
@@ -590,6 +636,7 @@ async def _notify_turn_log(battle: BattleSession):
 
 async def _finish_battle(battle: BattleSession, winner, surrender: bool = False):
     battle.done = True
+    await _ephemerals.flush()
     active_players.discard(battle.a_user.id)
     active_players.discard(battle.b_user.id)
     for m in filter(None, (battle.turn_log_msg,)):
