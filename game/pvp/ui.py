@@ -575,12 +575,6 @@ async def _resolve(session: PVPSession, interaction: discord.Interaction):
         embed=discord.Embed(title="⚔️ Đang vào trận...", color=PVP_COLOR)
     )
     await _post_panel(battle)
-    for m in session.confirm_msgs:
-        try:
-            await m.delete()
-        except Exception:
-            pass
-    session.confirm_msgs.clear()
     await _ephemerals.flush()
 
 
