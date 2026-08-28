@@ -547,11 +547,10 @@ def _fighter_card_value(f):
 def _battle_embed(battle: BattleSession):
     owner = battle._owner_active()
     e = discord.Embed(title=f"⚔️ PvP — Lượt {owner.display_name}", color=PVP_COLOR)
-    e.set_author(name="Chị Cá 🐟 PvP")
     try:
-        e.set_thumbnail(url=owner.display_avatar.url)
+        e.set_author(name=f"Đến lượt: {owner.display_name}", icon_url=owner.display_avatar.url)
     except Exception:
-        pass
+        e.set_author(name=f"Đến lượt: {owner.display_name}")
     sp = battle.sp_a if battle.active_team == "A" else battle.sp_b
     e.add_field(
         name=f"🔵 {battle.a_user.display_name}",
