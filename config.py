@@ -90,6 +90,7 @@ GACHA_KEYWORDS = ["gacha", "quay", "roll"]
 COLLECTION_KEYWORDS = ["sở hữu", "collection", "kho", "bộ sưu tập"]
 
 PVP_KEYWORDS = ["pvp", "pk", "thách đấu"]
+PVP_RANK_KEYWORDS = ["điểm", "top"]
 PVP_TEAM_SIZE = 3
 PVP_MAX_ROUND = 30
 PVP_K = 32

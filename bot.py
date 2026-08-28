@@ -37,6 +37,7 @@ from config import (
     GACHA_KEYWORDS,
     COLLECTION_KEYWORDS,
     PVP_KEYWORDS,
+    PVP_RANK_KEYWORDS,
 )
 from game.pvp.ui import start_pvp_challenge, handle_pvp_rank, handle_card_info
 from game.pvp.cards import find_card
@@ -112,6 +113,7 @@ MENU_PAGES = [
             ("🎴 Gacha", "`chị cá` + `gacha` / `gacha 1` / `gacha 5` (50đ / 250đ)"),
             ("🗃️ Kho thẻ", "`chị cá` + `kho` (xem các thẻ đã có)"),
             ("⚔️ PvP", "`chị cá pvp @người_chơi` (3v3 turn-based, ELO)"),
+            ("🏆 Xếp hạng PvP", "`chị cá pvp top` / `chị cá pvp điểm`"),
             ("ℹ️ Thông tin thẻ", "`chị cá skill tên` (vd: `chị cá skill skirk` — xem thẻ đã sở hữu)"),
         ],
     ),
@@ -798,18 +800,18 @@ async def on_message(message):
         await handle_collection(message.channel, message.author, bot)
         return
 
-    is_point = addressed and any(kw in content_lower for kw in POINT_KEYWORDS)
-    if is_point:
-        await handle_points(message, bot)
-        return
-
     is_pvp = addressed and any(kw in content_lower for kw in PVP_KEYWORDS)
     if is_pvp:
         cl = message.content.lower()
-        if any(k in cl for k in ("rank", "top", "xếp hạng", "leaderboard", "bảng")):
+        if any(k in cl for k in PVP_RANK_KEYWORDS):
             await handle_pvp_rank(message, bot)
         else:
             await start_pvp_challenge(message, bot)
+        return
+
+    is_point = addressed and any(kw in content_lower for kw in POINT_KEYWORDS)
+    if is_point:
+        await handle_points(message, bot)
         return
 
     is_card_info = (
