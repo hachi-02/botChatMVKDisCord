@@ -165,7 +165,7 @@ async def _begin_selection(interaction, session: PVPSession, side: str):
     max_pick = min(PVP_TEAM_SIZE, len(cards))
     options = [
         discord.SelectOption(
-            label=f"{c['name']}" + (f" x{owned[c['key']]}" if owned.get(c["key"], 1) > 1 else ""),
+            label=f"{c['name']} ({'5★' if c['rarity'].startswith('5') else '4★'})",
             value=c["key"],
             description=f"{ROLE_LABEL[c['role']]} • {c['element']}",
             emoji=ELEMENT_EMOJI.get(c["element"], "❔"),
