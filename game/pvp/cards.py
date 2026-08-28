@@ -30,6 +30,9 @@ CHARACTER_POOL = [
     {"key": "bennett", "name": "Bennett", "url": "https://res.cloudinary.com/z2ffqaaf/image/upload/v1787824206/Bennett_Dynamic_Skin_r9srqp.webp", "rarity": "4", "role": "SUP", "element": "Pyro", "atk": 50, "hp": 185, "spd": 55, "crit_rate": 0.08, "crit_dmg": 1.4, "skill": {"name": "Can Trường", "type": "HEAL", "power": 40, "cost": 3}, "ultimate": {"name": "Can Trường Tuyệt Kỹ", "type": "HEAL_BUFF", "power": 100, "power2": 0.40}},
 ]
 
+for _c in CHARACTER_POOL:
+    _c["hp"] = round(_c["hp"] * 2 * 1.3)
+
 RARITY_BY_KEY = {c["key"]: c["rarity"] for c in CHARACTER_POOL}
 
 ROLE_LABEL = {"DPS": "⚔️ Công", "TANK": "🛡️ Thủ", "SUP": "✨ Hỗ Trợ"}
