@@ -109,12 +109,12 @@ MENU_PAGES = [
     (
         "🎮 Trò chơi & Điểm",
         [
-            ("🏆 Điểm", "`chị cá` + `điểm` / `chị cá top`"),
+            ("🏆 Điểm", "`chị cá` + `điểm` / `top`"),
             ("🎴 Gacha", "`chị cá` + `gacha` / `gacha 1` / `gacha 5` (50đ / 250đ)"),
             ("🗃️ Kho thẻ", "`chị cá` + `kho` (xem các thẻ đã có)"),
-            ("⚔️ PvP", "`chị cá pvp @người_chơi` (3v3 turn-based, ELO)"),
-            ("🏆 Xếp hạng PvP", "`chị cá pvp top` / `chị cá pvp điểm`"),
-            ("ℹ️ Thông tin thẻ", "`chị cá skill tên` (vd: `chị cá skill skirk` — xem thẻ đã sở hữu)"),
+            ("⚔️ PvP", "`chị cá` + `pvp @người_chơi` (3v3 turn-based, ELO)"),
+            ("🏆 Xếp hạng PvP", "`chị cá` + `pvp điểm` / `pvp top`"),
+            ("ℹ️ Thông tin thẻ", "`chị cá` + `skill + tên` (vd: `chị cá skill skirk` — xem thẻ đã sở hữu)"),
         ],
     ),
 ]
