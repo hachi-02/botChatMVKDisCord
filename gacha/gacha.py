@@ -11,6 +11,7 @@ from db import (
     add_card,
     get_collection,
 )
+from game.pvp.ui import is_in_pvp
 from .cards import CHARACTER_POOL, RARITY_COLOR, RARITY_LABEL
 
 EMBED_COLOR = 0x1ABC9C
@@ -81,6 +82,11 @@ def roll_one(state):
 
 
 async def handle_gacha(channel, author, bot, n):
+    if is_in_pvp(author.id):
+        await channel.send(
+            f"{author.mention} đang trong trận PvP, xong trận mới quay gacha được nhé 🐟"
+        )
+        return
     cost = GACHA_COST if n == 1 else GACHA_COST5
     uid = author.id
     pts = await get_points(uid)
@@ -181,6 +187,12 @@ class GachaView(discord.ui.View):
         await self._run(interaction, 5)
 
     async def _run(self, interaction, n):
+        if is_in_pvp(interaction.user.id):
+            await interaction.response.send_message(
+                "Em đang trong trận PvP, xong trận mới quay gacha được nhé 🐟",
+                ephemeral=True,
+            )
+            return
         for item in self.children:
             item.disabled = True
         await interaction.response.edit_message(view=self)

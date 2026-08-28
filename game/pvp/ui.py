@@ -1,4 +1,5 @@
 import asyncio
+import random
 
 import discord
 
@@ -33,6 +34,10 @@ from .battle_image import prepare_battle_image, render_battle_image
 PVP_COLOR = 0x9B59B6
 pending_challenges = set()
 active_players = set()
+
+
+def is_in_pvp(user_id: int) -> bool:
+    return user_id in active_players
 
 
 class _EphemeralStore:
@@ -80,10 +85,17 @@ class PVPSession:
         self.channel = channel
         self.a_cards = None
         self.b_cards = None
+        self.first_user = None
+        self.second_user = None
         self.done = False
         self.cancelled = False
         self.select_msgs = []
         self.confirm_msgs = []
+
+    def user_for_side(self, side: str):
+        if side == "A":
+            return self.first_user or self.challenger
+        return self.second_user or self.target
 
 
 def _bar(done, total, size=10):
@@ -160,11 +172,26 @@ class ChallengeView(discord.ui.View):
             return
         for item in self.children:
             item.disabled = True
+        first = random.choice([self.session.challenger, self.session.target])
+        second = (
+            self.session.target
+            if first.id == self.session.challenger.id
+            else self.session.challenger
+        )
+        self.session.first_user = first
+        self.session.second_user = second
         await interaction.response.edit_message(
-            content=f"✅ {self.session.target.mention} đã chấp nhận! Đang lập đội...",
+            content=(
+                f"✅ {self.session.target.mention} đã chấp nhận!\n"
+                f"🎲 **{first.display_name}** được chọn đi trước."
+            ),
             view=self,
         )
         self.stop()
+        await interaction.followup.send(
+            f"🎲 Xúc xắc: {first.mention} **đi trước**, "
+            f"{second.mention} đi sau.\nTiếp theo: chọn đội hình!"
+        )
         await _begin_selection(interaction, self.session, "A")
 
     @discord.ui.button(label="❌ Từ chối", style=discord.ButtonStyle.danger)
@@ -264,7 +291,7 @@ class TeamSelectView(discord.ui.View):
                 "⏳ Trận đã bị hủy!", ephemeral=True
             )
             return
-        expected = self.session.challenger.id if self.side == "A" else self.session.target.id
+        expected = self.session.user_for_side(self.side).id
         if interaction.user.id != expected:
             await _ephemerals.send(interaction, "Không phải lượt chọn của em!")
             return
@@ -298,7 +325,7 @@ class TeamSelectView(discord.ui.View):
 async def _begin_selection(interaction, session: PVPSession, side: str):
     if session.cancelled or session.done:
         return
-    user = session.challenger if side == "A" else session.target
+    user = session.user_for_side(side)
     rows = await get_collection(user.id)
     owned = {r["char_key"]: r["dup_count"] for r in rows}
     cards = [c for k in owned if (c := get_card(k))]
@@ -553,7 +580,7 @@ async def _resolve(session: PVPSession, interaction: discord.Interaction):
 
     battle = BattleSession(
         session.a_cards, session.b_cards,
-        session.challenger, session.target,
+        session.user_for_side("A"), session.user_for_side("B"),
         interaction.channel, interaction.client,
     )
     battle.confirm_msgs = session.confirm_msgs
@@ -681,17 +708,21 @@ async def _finish_battle(battle: BattleSession, winner, surrender: bool = False)
         await update_pvp_result(win_user.id, lose_user.id, w_new, l_new, draw)
 
     embed = _result_embed(battle, ra, na, rb, nb, win_user, lose_user, draw, surrender)
-    kwargs = {"embed": embed, "view": None}
+    send_kwargs = {"embed": embed}
     if battle._img_ok:
         try:
-            # Message.edit() dùng "attachments", KHÔNG phải "files"
-            kwargs["attachments"] = [discord.File(render_battle_image(battle), filename="battle.png")]
+            send_kwargs["file"] = discord.File(render_battle_image(battle), filename="battle.png")
         except Exception:
             pass
     try:
-        await battle.message.edit(**kwargs)
+        await battle.channel.send(**send_kwargs)
     except Exception as e:
         print("LỖI FINISH_BATTLE:", e, flush=True)
+    if battle.message is not None:
+        try:
+            await battle.message.edit(view=None)
+        except Exception:
+            pass
 
 
 # ====================== EMBEDS ======================

@@ -39,7 +39,7 @@ from config import (
     PVP_KEYWORDS,
     PVP_RANK_KEYWORDS,
 )
-from game.pvp.ui import start_pvp_challenge, handle_pvp_rank, handle_card_info
+from game.pvp.ui import start_pvp_challenge, handle_pvp_rank, handle_card_info, is_in_pvp
 from game.pvp.cards import find_card
 from ai import ai, get_system_prompt, clean_ai_response
 from memory import add_message, get_history, remember_user, get_known_users
@@ -773,6 +773,12 @@ async def on_message(message):
 
     is_gacha = addressed and any(kw in content_lower for kw in GACHA_KEYWORDS)
     if is_gacha:
+        if is_in_pvp(message.author.id):
+            await message.channel.send(
+                "Em đang trong trận PvP, xong trận mới quay gacha được nhé 🐟",
+                reference=message,
+            )
+            return
         cl = message.content.lower()
         if "5" in cl:
             n = 5
