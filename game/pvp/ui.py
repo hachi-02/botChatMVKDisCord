@@ -266,11 +266,12 @@ async def _begin_selection(interaction, session: PVPSession, side: str):
     rows = await get_collection(user.id)
     owned = {r["char_key"]: r["dup_count"] for r in rows}
     cards = [c for k in owned if (c := get_card(k))]
-    if not cards:
+    if len(cards) < PVP_TEAM_SIZE:
         session.cancelled = True
         _release_session(session)
         await interaction.followup.send(
-            f"{user.mention} chưa có thẻ nào để đánh! (quay gacha trước đi 🎴)",
+            f"{user.mention} cần ít nhất **{PVP_TEAM_SIZE}** thẻ để đấu "
+            f"(hiện có {len(cards)} thẻ)! Quay gacha nữa nè 🎴",
             ephemeral=True,
         )
         await _cancel_team_select(session)
@@ -864,15 +865,18 @@ async def start_pvp_challenge(message, bot):
 
     rows_a = await get_collection(message.author.id)
     rows_b = await get_collection(target.id)
-    if not rows_a:
+    if len(rows_a) < PVP_TEAM_SIZE:
         await message.channel.send(
-            f"{message.author.mention} chưa có thẻ nào (quay gacha trước đã) 🎴",
+            f"{message.author.mention} cần ít nhất **{PVP_TEAM_SIZE}** thẻ để đấu "
+            f"(hiện có {len(rows_a)} thẻ)! Quay gacha nữa nè 🎴",
             reference=message,
         )
         return
-    if not rows_b:
+    if len(rows_b) < PVP_TEAM_SIZE:
         await message.channel.send(
-            f"{target.mention} chưa có thẻ nào để đấu 🎴", reference=message
+            f"{target.mention} cần ít nhất **{PVP_TEAM_SIZE}** thẻ để đấu "
+            f"(hiện có {len(rows_b)} thẻ) 🎴",
+            reference=message,
         )
         return
 
