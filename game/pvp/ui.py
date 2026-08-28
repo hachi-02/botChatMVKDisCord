@@ -602,7 +602,8 @@ async def _post_panel(battle: BattleSession):
     kwargs = {"embed": embed, "view": ControlPanelView(battle)}
     if battle._img_ok:
         try:
-            kwargs["files"] = [discord.File(render_battle_image(battle), filename="battle.png")]
+            # Message.edit() dùng "attachments", KHÔNG phải "files" (khác với Messageable.send())
+            kwargs["attachments"] = [discord.File(render_battle_image(battle), filename="battle.png")]
         except Exception as e:
             print("LỖI RENDER_IMAGE:", e, flush=True)
             battle._img_ok = False
@@ -686,7 +687,8 @@ async def _finish_battle(battle: BattleSession, winner, surrender: bool = False)
     kwargs = {"embed": embed, "view": None}
     if battle._img_ok:
         try:
-            kwargs["files"] = [discord.File(render_battle_image(battle), filename="battle.png")]
+            # Message.edit() dùng "attachments", KHÔNG phải "files"
+            kwargs["attachments"] = [discord.File(render_battle_image(battle), filename="battle.png")]
         except Exception:
             pass
     try:
