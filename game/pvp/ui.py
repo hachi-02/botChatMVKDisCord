@@ -546,21 +546,21 @@ def _fighter_card_value(f):
 
 def _battle_embed(battle: BattleSession):
     owner = battle._owner_active()
-    e = discord.Embed(title=f"⚔️ PvP — Lượt {owner.display_name}", color=PVP_COLOR)
+    e = discord.Embed(title=f"⚔️ PVP — LƯỢT {owner.display_name.upper()}", color=PVP_COLOR)
     try:
-        e.set_author(name=f"Đến lượt: {owner.display_name}", icon_url=owner.display_avatar.url)
+        e.set_author(name=f"ĐẾN LƯỢT: {owner.display_name.upper()}", icon_url=owner.display_avatar.url)
     except Exception:
-        e.set_author(name=f"Đến lượt: {owner.display_name}")
+        e.set_author(name=f"ĐẾN LƯỢT: {owner.display_name.upper()}")
     sp = battle.sp_a if battle.active_team == "A" else battle.sp_b
     e.add_field(
-        name=f"🔵 {battle.a_user.display_name}",
+        name=f"🔵 ĐỘI HÌNH CỦA {battle.a_user.display_name.upper()}",
         value=f"🔋 SP {_sp_of_team(battle, 'A')}/{PVP_SP_MAX}",
         inline=False,
     )
     for f in battle.team_a:
         _fighter_field(e, f)
     e.add_field(
-        name=f"🔴 {battle.b_user.display_name}",
+        name=f"🔴 ĐỘI HÌNH CỦA {battle.b_user.display_name.upper()}",
         value=f"🔋 SP {_sp_of_team(battle, 'B')}/{PVP_SP_MAX}",
         inline=False,
     )
