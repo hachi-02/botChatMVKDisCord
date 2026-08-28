@@ -749,15 +749,15 @@ def _result_embed(battle, a_old, a_new, b_old, b_new, win_user, lose_user, draw,
     if draw:
         e.add_field(
             name=f"🔵 {battle.a_user.display_name} ({_signed(a_new - a_old)})",
-            value=f"Bậc rank **{a_old} → {a_new}**",
+            value=f"Bậc ELO **{a_old} → {a_new}**",
             inline=True,
         )
         e.add_field(
             name=f"🔴 {battle.b_user.display_name} ({_signed(b_new - b_old)})",
-            value=f"Bậc rank **{b_old} → {b_new}**",
+            value=f"Bậc ELO **{b_old} → {b_new}**",
             inline=True,
         )
-        e.set_footer(text="Hòa, không đổi rank")
+        e.set_footer(text="Hòa, không đổi ELO")
         return e
 
     if win_user.id == battle.a_user.id:
@@ -767,12 +767,12 @@ def _result_embed(battle, a_old, a_new, b_old, b_new, win_user, lose_user, draw,
 
     e.add_field(
         name=f"🏆 {win_user.display_name} ({_signed(w_new - w_old)})",
-        value=f"Bậc rank **{w_old} → {w_new}**",
+        value=f"Bậc ELO **{w_old} → {w_new}**",
         inline=True,
     )
     e.add_field(
         name=f"💀 {lose_user.display_name} ({_signed(l_new - l_old)})",
-        value=f"Bậc rank **{l_old} → {l_new}**",
+        value=f"Bậc ELO **{l_old} → {l_new}**",
         inline=True,
     )
     e.set_footer(text=f"🎉 Chúc mừng {win_user.display_name} chiến thắng!")
@@ -860,7 +860,7 @@ async def handle_pvp_rank(message, bot):
                 name = user.display_name if user else f"user {uid}"
                 e.add_field(
                     name=f"{medals.get(i, f'#{i}')} {name}",
-                    value=f"⭐ Rank **{r['rating']}** · {r['wins']}W/{r['losses']}L",
+                    value=f"⭐ ELO **{r['rating']}** · {r['wins']}W/{r['losses']}L",
                     inline=False,
                 )
         await message.channel.send(embed=e, reference=message)
@@ -874,8 +874,8 @@ async def handle_pvp_rank(message, bot):
     e = discord.Embed(title=f"⭐ Hạng PvP của {target.display_name}", color=PVP_COLOR)
     e.set_author(name="Chị Cá 🐟 PvP")
     e.set_thumbnail(url=target.display_avatar.url)
-    e.add_field(name="Rank", value=f"**{rating}**", inline=True)
+    e.add_field(name="ELO", value=f"**{rating}**", inline=True)
     e.add_field(name="Thắng", value=f"{wins}", inline=True)
     e.add_field(name="Thua", value=f"{losses}", inline=True)
-    e.set_footer(text="Thắng +rank, thua -rank (ELO K=32)")
+    e.set_footer(text="Thắng +ELO, thua -ELO (K=32)")
     await message.channel.send(embed=e, reference=message)
