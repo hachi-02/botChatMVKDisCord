@@ -195,9 +195,9 @@ class ControlPanelView(discord.ui.View):
                 placeholder="① Chọn thẻ hành động",
                 min_values=1, max_values=1,
                 options=[discord.SelectOption(
-                    label=f["name"], value=f["key"],
-                    description=f"{ROLE_LABEL[f['role']]} • {f['element']}",
-                    emoji=ELEMENT_EMOJI.get(f["element"], "❔"),
+                    label=f.name, value=f.key,
+                    description=f"{ROLE_LABEL[f.role]} • {f.element}",
+                    emoji=ELEMENT_EMOJI.get(f.element, "❔"),
                 ) for f in chars],
             )
             self.char_select.callback = self._noop
@@ -207,9 +207,9 @@ class ControlPanelView(discord.ui.View):
                 placeholder="② Chọn mục tiêu địch",
                 min_values=1, max_values=1,
                 options=[discord.SelectOption(
-                    label=e["name"], value=e["key"],
-                    description=f"{ROLE_LABEL[e['role']]} • {e['element']}",
-                    emoji=ELEMENT_EMOJI.get(e["element"], "❔"),
+                    label=e.name, value=e.key,
+                    description=f"{ROLE_LABEL[e.role]} • {e.element}",
+                    emoji=ELEMENT_EMOJI.get(e.element, "❔"),
                 ) for e in enemies],
             )
             self.target_select.callback = self._noop
