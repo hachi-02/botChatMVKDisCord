@@ -643,7 +643,8 @@ async def _notify_turn_log(battle: BattleSession):
         shown = log[:12] + (["..."] if len(log) > 12 else [])
         e.description = "```" + "\n".join(shown) + "```"
         e.set_footer(text=f"⚔️ Đến lượt {battle._owner_active().display_name}")
-        battle.turn_log_msg = await battle.channel.send(embed=e)
+        msg = await battle.channel.send(embed=e)
+        battle.turn_log_msgs.append(msg)
         battle.log = []
     except Exception as err:
         print("LỖI NOTIFY_TURN_LOG:", err, flush=True)
@@ -654,11 +655,12 @@ async def _finish_battle(battle: BattleSession, winner, surrender: bool = False)
     await _ephemerals.flush()
     active_players.discard(battle.a_user.id)
     active_players.discard(battle.b_user.id)
-    for m in filter(None, (battle.turn_log_msg,)):
+    for m in battle.turn_log_msgs:
         try:
             await m.delete()
         except Exception:
             pass
+    battle.turn_log_msgs.clear()
     ra_row = await get_pvp_rating(battle.a_user.id)
     rb_row = await get_pvp_rating(battle.b_user.id)
     ra = ra_row["rating"]

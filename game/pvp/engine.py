@@ -192,7 +192,7 @@ class BattleSession:
         self.log = []
         self._img_ok = False
         self.message = None
-        self.turn_log_msg = None
+        self.turn_log_msg = []
         self.done = False
         self._start_rotation(self.team_a)
 
