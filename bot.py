@@ -85,28 +85,74 @@ def _event_help_embed(bot):
     return e
 
 
-def _menu_embed(bot):
-    e = discord.Embed(title="Menu Chị Cá", color=EMBED_COLOR)
+MENU_PAGES = [
+    (
+        "💬 Trò chuyện & Thông tin",
+        [
+            ("💬 Nói chuyện", "Gọi `chị cá` hoặc tag chị"),
+            ("🔍 Tìm web", "`chị cá` + \"tìm\", \"là ai\", \"khi nào\"..."),
+            ("👥 Thành viên online", "`chị cá` + \"ai đang online\""),
+            ("🔎 Tóm tắt", "`chị cá` + `tóm tắt 1 tiếng` / `tóm tắt 30 tin`"),
+        ],
+    ),
+    (
+        "🛠️ Công cụ Server",
+        [
+            ("📊 Vote", "`chị cá` + `vote Câu hỏi? | chọn 1 | chọn 2`"),
+            ("⏰ Nhắc", "`chị cá` + `nhắc em 7h học bài`"),
+            ("📅 Sự kiện", "`chị cá tạo sự kiện` + `Tên | thời gian | mô tả | địa điểm`"),
+            ("🔗 Lời mời", "`chị cá` + `tạo link mời`"),
+        ],
+    ),
+    (
+        "🎮 Trò chơi & Điểm",
+        [
+            ("🏆 Điểm", "`chị cá` + `điểm` / `chị cá top`"),
+            ("🎴 Gacha", "`chị cá` + `gacha` / `gacha 1` / `gacha 5` (50đ / 250đ)"),
+            ("🗃️ Kho thẻ", "`chị cá` + `kho` (xem các thẻ đã có)"),
+            ("⚔️ PvP", "`chị cá pvp @người_chơi` (3v3 turn-based, ELO)"),
+        ],
+    ),
+]
+
+
+def _menu_embed(bot, page=0):
+    title, items = MENU_PAGES[page]
+    e = discord.Embed(title=f"Menu Chị Cá — {title}", color=EMBED_COLOR)
     if bot.user:
         e.set_author(name="Chị Cá", icon_url=bot.user.display_avatar.url)
     e.set_thumbnail(url=LEVELUP_GIF)
-    items = [
-        ("💬 Nói chuyện", "Gọi `chị cá` hoặc tag chị"),
-        ("🔍 Tìm web", "`chị cá` + \"tìm\", \"là ai\", \"khi nào\"..."),
-        ("👥 Thành viên online", "`chị cá` + \"ai đang online\""),
-        ("📊 Vote", "`chị cá` + `vote Câu hỏi? | chọn 1 | chọn 2`"),
-        ("⏰ Nhắc", "`chị cá` + `nhắc em 7h học bài`"),
-        ("📅 Sự kiện", "`chị cá tạo sự kiện` + `Tên | thời gian | mô tả | địa điểm`"),
-        ("🔗 Lời mời", "`chị cá` + `tạo link mời`"),
-        ("🔎 Tóm tắt", "`chị cá` + `tóm tắt 1 tiếng` / `tóm tắt 30 tin`"),
-        ("🏆 Điểm", "`chị cá` + `điểm` / `chị cá top`"),
-        ("🎴 Gacha", "`chị cá` + `gacha` / `gacha 1` / `gacha 5` (50đ / 250đ)"),
-        ("🗃️ Kho thẻ", "`chị cá` + `kho` (xem các thẻ đã có)"),
-    ]
     for name, val in items:
         e.add_field(name=name, value=val, inline=True)
-    e.set_footer(text="Gõ chị cá menu để xem lại nhé!")
+    e.set_footer(text=f"Trang {page + 1}/{len(MENU_PAGES)} • Gõ \"chị cá menu\" để xem lại nhé!")
     return e
+
+
+class MenuView(discord.ui.View):
+    def __init__(self, bot):
+        super().__init__(timeout=120)
+        self.bot = bot
+        self.page = 0
+
+    async def _show(self, interaction):
+        self.page_indicator.label = f"{self.page + 1}/{len(MENU_PAGES)}"
+        await interaction.response.edit_message(
+            embed=_menu_embed(self.bot, self.page), view=self
+        )
+
+    @discord.ui.button(label="◀️", style=discord.ButtonStyle.secondary)
+    async def prev(self, interaction, button):
+        self.page = (self.page - 1) % len(MENU_PAGES)
+        await self._show(interaction)
+
+    @discord.ui.button(label="1/1", style=discord.ButtonStyle.secondary, disabled=True)
+    async def page_indicator(self, interaction, button):
+        pass
+
+    @discord.ui.button(label="▶️", style=discord.ButtonStyle.secondary)
+    async def next(self, interaction, button):
+        self.page = (self.page + 1) % len(MENU_PAGES)
+        await self._show(interaction)
 
 
 SUMMARY_SYSTEM_PROMPT = (
@@ -482,7 +528,9 @@ async def on_message(message):
         kw in content_lower for kw in HELP_KEYWORDS
     )
     if is_general_help:
-        await message.channel.send(embed=_menu_embed(bot), reference=message)
+        await message.channel.send(
+            embed=_menu_embed(bot, 0), view=MenuView(bot), reference=message
+        )
         return
 
     is_event = addressed and any(kw in content_lower for kw in EVENT_KEYWORDS)
