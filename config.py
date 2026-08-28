@@ -99,4 +99,5 @@ PVP_TURN_TIMEOUT = 60
 PVP_ENERGY_MAX = 100
 PVP_SP_START = 3
 PVP_SP_MAX = 5
-PVP_BATTLE_ANIM_GIF = "https://res.cloudinary.com/z2ffqaaf/image/upload/v1787830778/animationgacha_grcwt8.webp"
+PVP_BATTLE_ANIM_GIF = "https://res.cloudinary.com/z2ffqaaf/image/upload/v1787884964/giphy_felw8m.gif"
+PVP_CHALLENGE_GIF = "https://res.cloudinary.com/z2ffqaaf/image/upload/v1787884708/giphy_l5i3pz.gif"

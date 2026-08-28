@@ -10,6 +10,7 @@ from config import (
     PVP_SP_MAX,
     PVP_START_RATING,
     PVP_BATTLE_ANIM_GIF,
+    PVP_CHALLENGE_GIF,
 )
 from db import (
     get_collection,
@@ -717,7 +718,7 @@ async def start_pvp_challenge(message, bot):
         color=PVP_COLOR,
     )
     e.set_author(name="Chị Cá 🐟 PvP")
-    e.set_thumbnail(url=PVP_BATTLE_ANIM_GIF)
+    e.set_thumbnail(url=PVP_CHALLENGE_GIF)
     e.set_footer(text="Mỗi lượt: chọn thẻ + mục tiêu + hành động (Đánh thường/Skill/Ultimate) · SP chung team")
     await message.channel.send(embed=e, view=ChallengeView(session), reference=message)
 
