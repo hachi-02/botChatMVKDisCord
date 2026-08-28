@@ -280,13 +280,13 @@ async def update_pvp_result(
         await db_pool.execute(
             "INSERT INTO pvp_rank(user_id, rating, wins, losses, last) "
             "VALUES($1,$2,1,0,now()) "
-            "ON CONFLICT(user_id) DO UPDATE SET rating=$2, wins=wins+1, last=now()",
+            "ON CONFLICT(user_id) DO UPDATE SET rating=$2, wins=pvp_rank.wins+1, last=now()",
             winner_id, new_winner_rating,
         )
         await db_pool.execute(
             "INSERT INTO pvp_rank(user_id, rating, wins, losses, last) "
             "VALUES($1,$2,0,1,now()) "
-            "ON CONFLICT(user_id) DO UPDATE SET rating=$2, losses=losses+1, last=now()",
+            "ON CONFLICT(user_id) DO UPDATE SET rating=$2, losses=pvp_rank.losses+1, last=now()",
             loser_id, new_loser_rating,
         )
     except Exception as e:
