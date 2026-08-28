@@ -159,6 +159,15 @@ class GachaView(discord.ui.View):
         super().__init__(timeout=180)
         self.bot = bot
         self.author = author
+        self.message = None
+
+    async def on_timeout(self):
+        for item in self.children:
+            item.disabled = True
+        try:
+            await self.message.edit(view=self)
+        except Exception:
+            pass
 
     async def interaction_check(self, interaction):
         return interaction.user.id == self.author.id

@@ -132,7 +132,7 @@ def _menu_embed(bot, page=0):
 
 class MenuView(discord.ui.View):
     def __init__(self, bot):
-        super().__init__(timeout=120)
+        super().__init__(timeout=None)
         self.bot = bot
         self.page = 0
 
@@ -788,7 +788,9 @@ async def on_message(message):
                 color=EMBED_COLOR,
             )
             e.set_footer(text="1 lần = 50đ • 5 lần = 250đ")
-            await message.channel.send(embed=e, view=GachaView(bot, message.author))
+            view = GachaView(bot, message.author)
+            g_msg = await message.channel.send(embed=e, view=view)
+            view.message = g_msg
         return
 
     is_collection = addressed and any(kw in content_lower for kw in COLLECTION_KEYWORDS)
