@@ -146,6 +146,25 @@ class ChallengeView(discord.ui.View):
         self.stop()
         self.session.done = True
 
+    @discord.ui.button(label="🚫 Hủy", style=discord.ButtonStyle.danger)
+    async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.session.challenger.id:
+            await interaction.response.send_message(
+                "Chỉ người thách đấu mới được hủy!", ephemeral=True
+            )
+            return
+        if self.session.cancelled or self.session.done:
+            return
+        self.session.cancelled = True
+        _release_session(self.session)
+        for item in self.children:
+            item.disabled = True
+        await interaction.response.edit_message(
+            content=f"🚫 {interaction.user.mention} đã hủy thách đấu.",
+            view=self,
+        )
+        self.stop()
+
 
 # ====================== TEAM SELECT ======================
 class TeamSelectView(discord.ui.View):
@@ -161,6 +180,37 @@ class TeamSelectView(discord.ui.View):
         )
         select.callback = self._on_select
         self.add_item(select)
+        cancel = discord.ui.Button(label="🚫 Hủy trận", style=discord.ButtonStyle.danger, row=1)
+        cancel.callback = self._cancel
+        self.add_item(cancel)
+
+    async def _cancel(self, interaction: discord.Interaction):
+        session = self.session
+        if session.cancelled or session.done:
+            return
+        if interaction.user.id not in (session.challenger.id, session.target.id):
+            await interaction.response.send_message(
+                "Em không phải người trong trận!", ephemeral=True
+            )
+            return
+        session.cancelled = True
+        _release_session(session)
+        await interaction.response.defer()
+        other = (
+            session.target if interaction.user.id == session.challenger.id
+            else session.challenger
+        )
+        for m in session.select_msgs:
+            try:
+                await m.delete()
+            except Exception:
+                pass
+        try:
+            await session.channel.send(
+                f"🚫 {interaction.user.mention} đã hủy trận với {other.mention} trong lúc chọn đội."
+            )
+        except Exception:
+            pass
 
     async def on_timeout(self):
         if self.session.cancelled or self.session.done:
