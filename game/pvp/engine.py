@@ -1,6 +1,6 @@
 import random
 
-from config import PVP_ENERGY_MAX, PVP_MAX_ROUND, PVP_SP_START, PVP_SP_MAX
+from config import PVP_ENERGY_MAX, PVP_MAX_ROUND, PVP_SP_START, PVP_SP_MAX, PVP_DODGE_FACTOR, PVP_DODGE_CAP
 
 from .cards import ELEMENT_ADVANTAGE, ELEM_STRONG, ELEM_WEAK
 
@@ -46,6 +46,8 @@ def _elem_mult(att_elem: str, def_elem: str) -> float:
 
 
 def _compute_damage(attacker: Fighter, defender: Fighter, mult: float):
+    if random.random() < min(PVP_DODGE_CAP, defender.spd * PVP_DODGE_FACTOR / 100):
+        return 0, False, True
     base = (
         attacker.atk
         * (1 + attacker.atk_buff)
@@ -65,7 +67,7 @@ def _compute_damage(attacker: Fighter, defender: Fighter, mult: float):
     dmg = max(1, dmg)
     defender.hp -= dmg
     defender.gain_energy(10)
-    return dmg, crit
+    return dmg, crit, False
 
 
 def _lowest_alive(team: list):
@@ -82,13 +84,19 @@ def _apply_effect(caster: Fighter, team: list, enemy: list, eff: dict, log: list
     tag = f"🔮 **{caster.name}** → **{eff['name']}**"
     if t == "ST_DMG":
         if target and target.alive:
-            dmg, crit = _compute_damage(caster, target, p)
-            log.append(f"{tag}: {target.name} mất {dmg} HP{' 💥' if crit else ''}")
+            dmg, crit, dodged = _compute_damage(caster, target, p)
+            if dodged:
+                log.append(f"{tag}: {target.name} né đòn 💨")
+            else:
+                log.append(f"{tag}: {target.name} mất {dmg} HP{' 💥' if crit else ''}")
     elif t == "AOE_DMG":
         for e in enemy:
             if e.alive:
-                dmg, crit = _compute_damage(caster, e, p)
-                log.append(f"{tag}: {e.name} -{dmg} HP{' 💥' if crit else ''}")
+                dmg, crit, dodged = _compute_damage(caster, e, p)
+                if dodged:
+                    log.append(f"{tag}: {e.name} né đòn 💨")
+                else:
+                    log.append(f"{tag}: {e.name} -{dmg} HP{' 💥' if crit else ''}")
     elif t == "SHIELD_TEAM":
         for ally in team:
             ally.shield = max(ally.shield, p)
@@ -106,7 +114,7 @@ def _apply_effect(caster: Fighter, team: list, enemy: list, eff: dict, log: list
     elif t == "BUFF_SPD":
         for ally in team:
             ally.spd += p
-        log.append(f"{tag}: toàn đội +{p} tốc độ 💨")
+        log.append(f"{tag}: toàn đội +{p} né 💨")
     elif t == "DEBUFF_DEF":
         for e in enemy:
             e.def_debuff += p
@@ -132,8 +140,11 @@ def _apply_effect(caster: Fighter, team: list, enemy: list, eff: dict, log: list
             low.hp = min(low.max_hp, low.hp + p)
             log.append(f"{tag}: hồi {low.hp - before} HP cho {low.name} 💚")
         if target and target.alive:
-            dmg, crit = _compute_damage(caster, target, p2)
-            log.append(f"{tag}: {target.name} -{dmg} HP{' 💥' if crit else ''}")
+            dmg, crit, dodged = _compute_damage(caster, target, p2)
+            if dodged:
+                log.append(f"{tag}: {target.name} né đòn 💨")
+            else:
+                log.append(f"{tag}: {target.name} -{dmg} HP{' 💥' if crit else ''}")
     elif t == "HEAL_BUFF":
         low = _lowest_alive(team)
         heal_txt = ""
@@ -150,11 +161,14 @@ def _basic_attack(attacker: Fighter, target: Fighter, log: list):
     if target is None or not target.alive:
         log.append(f"➡️ {attacker.name} đánh thường nhưng không có mục tiêu")
         return
-    dmg, crit = _compute_damage(attacker, target, 1.0)
-    log.append(
-        f"➡️ {attacker.name} đánh thường {target.name}: -{dmg} HP"
-        f"{' 💥 CRIT!' if crit else ''}"
-    )
+    dmg, crit, dodged = _compute_damage(attacker, target, 1.0)
+    if dodged:
+        log.append(f"💨 {target.name} né đòn của {attacker.name}!")
+    else:
+        log.append(
+            f"➡️ {attacker.name} đánh thường {target.name}: -{dmg} HP"
+            f"{' 💥 CRIT!' if crit else ''}"
+        )
     attacker.gain_energy(20)
 
 

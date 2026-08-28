@@ -8,6 +8,7 @@ from config import (
     PVP_TURN_TIMEOUT,
     PVP_ENERGY_MAX,
     PVP_SP_MAX,
+    PVP_DODGE_FACTOR,
     PVP_START_RATING,
     PVP_BATTLE_ANIM_GIF,
     PVP_CHALLENGE_GIF,
@@ -587,7 +588,7 @@ def _effect_desc(eff: dict) -> str:
     if t == "BUFF_ATK":
         return f"Toàn đội +{int(p*100)}% ATK"
     if t == "BUFF_SPD":
-        return f"Toàn đội +{p} tốc độ"
+        return f"Toàn đội +{p} kim né 💨"
     if t == "DEBUFF_DEF":
         return f"Địch nhận thêm +{int(p*100)}% sát thương"
     if t == "STUN":
@@ -617,7 +618,7 @@ def _card_info_embed(card, owned_count):
         inline=False,
     )
     e.add_field(
-        name=f"❤️ HP: {card['hp']} · ⚔️ ATK: {card['atk']} · ⚡ SPD: {card['spd']}",
+        name=f"❤️ HP: {card['hp']} · ⚔️ ATK: {card['atk']} · 💨 Né: ~{card['spd'] * PVP_DODGE_FACTOR:.0f}%",
         value="\u200b",
         inline=False,
     )
