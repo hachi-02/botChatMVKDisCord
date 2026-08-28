@@ -623,62 +623,46 @@ def _battle_embed(battle: BattleSession):
 
 def _result_embed(battle, result, ra, rb, na, nb, win_user, lose_user, draw, surrender=False):
     if draw:
-        title = "🤝 HÒA!"
+        title = "🤝 ĐÃ HÒA!"
         color = 0x95A5A6
     elif surrender:
-        title = f"🏳️ {win_user.display_name} THẮNG (đối thủ đầu hàng)!"
+        title = f"🏆 {win_user.display_name} THẮNG!"
         color = 0xE67E22
     else:
         title = f"🏆 {win_user.display_name} THẮNG!"
-        color = ROLE_COLOR.get("DPS", PVP_COLOR)
+        color = PVP_COLOR
     e = discord.Embed(title=title, color=color)
     e.set_author(name="Chị Cá 🐟 PvP")
     if surrender and lose_user is not None:
-        e.description = f"🏳️ {lose_user.mention} đã đầu hàng, nhường chiến thắng cho {win_user.mention}."
-
-    ta = result["team_a"]
-    tb = result["team_b"]
-
-    e.add_field(
-        name=f"🔵 Đội {battle.a_user.display_name} (Rank {ra}→{na})",
-        value=_team_result_lines(ta),
-        inline=True,
-    )
-    e.add_field(
-        name=f"🔴 Đội {battle.b_user.display_name} (Rank {rb}→{nb})",
-        value=_team_result_lines(tb),
-        inline=True,
-    )
-
-    log = result["log"]
-    shown = (log[:10] + ["...", "..."] + log[-4:]) if len(log) > 16 else log
-    e.add_field(
-        name="📜 Diễn biến",
-        value="```" + "\n".join(shown) + "```" if shown else "—",
-        inline=False,
-    )
+        e.description = f"🏳️ {lose_user.mention} đã đầu hàng."
 
     if not draw:
         delta_a = na - ra
-        e.set_footer(
-            text=f"{win_user.display_name} {('+' if delta_a>=0 else '')}{delta_a} rank · "
-                 f"{lose_user.display_name} {nb-rb} rank"
+        delta_b = nb - rb
+        e.add_field(
+            name=f"🏆 {win_user.display_name} (+{delta_a})",
+            value=f"Bậc rank **{ra} → {na}**",
+            inline=True,
         )
+        e.add_field(
+            name=f"💀 {lose_user.display_name} ({delta_b})",
+            value=f"Bậc rank **{rb} → {nb}**",
+            inline=True,
+        )
+        e.set_footer(text=f"🎉 Chúc mừng {win_user.display_name} chiến thắng!")
     else:
+        e.add_field(
+            name=f"🔵 {battle.a_user.display_name}",
+            value=f"Bậc rank **{ra} → {na}**",
+            inline=True,
+        )
+        e.add_field(
+            name=f"🔴 {battle.b_user.display_name}",
+            value=f"Bậc rank **{rb} → {nb}**",
+            inline=True,
+        )
         e.set_footer(text="Hòa, không đổi rank")
     return e
-
-
-def _team_result_lines(team):
-    lines = []
-    for f in team:
-        status = "💀" if not f.alive else "❤️"
-        lines.append(
-            f"{status} {ELEMENT_EMOJI.get(f.element,'❔')} **{f.name}** "
-            f"[{ROLE_LABEL[f.role]}]\n"
-            f"{_bar(max(0,f.hp), f.max_hp)} {max(0,f.hp)}/{f.max_hp}"
-        )
-    return "\n".join(lines)
 
 
 # ====================== ENTRY POINTS ======================
