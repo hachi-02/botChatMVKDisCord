@@ -527,7 +527,6 @@ def _team_preview_cards(user, cards) -> list:
         e = discord.Embed(
             title=f"{ELEMENT_EMOJI.get(c['element'],'❔')} {c['name']} [{ROLE_LABEL[c['role']]}]",
             color=PVP_COLOR,
-            description=f"Đội hình của **{user.display_name}**",
         )
         try:
             e.set_thumbnail(url=c["url"])
@@ -535,7 +534,6 @@ def _team_preview_cards(user, cards) -> list:
             pass
         e.add_field(name="❤️ HP", value=str(c["hp"]), inline=True)
         e.add_field(name="⚔️ ATK", value=str(c["atk"]), inline=True)
-        e.add_field(name="🎯 Vai trò", value=ROLE_LABEL[c["role"]], inline=True)
         e.add_field(name=f"🔥 Skill · {c['skill']['name']}", value=_effect_desc(c["skill"]), inline=False)
         e.add_field(name=f"✨ Ultimate · {c['ultimate']['name']}", value=_effect_desc(c["ultimate"]), inline=False)
         embeds.append(e)
