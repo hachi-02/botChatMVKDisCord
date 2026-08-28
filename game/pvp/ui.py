@@ -530,7 +530,7 @@ def _team_preview_cards(user, cards) -> list:
             description=f"Đội hình của **{user.display_name}**",
         )
         try:
-            e.set_image(url=c["url"])
+            e.set_thumbnail(url=c["url"])
         except Exception:
             pass
         e.add_field(name="❤️ HP", value=str(c["hp"]), inline=True)
