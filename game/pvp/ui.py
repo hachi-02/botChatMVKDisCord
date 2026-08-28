@@ -152,8 +152,8 @@ class TeamSelectView(discord.ui.View):
 async def _begin_selection(interaction, session: PVPSession, side: str):
     user = session.challenger if side == "A" else session.target
     rows = await get_collection(user.id)
-    owned_keys = [r["char_key"] for r in rows]
-    cards = [get_card(k) for k in owned_keys if get_card(k)]
+    owned = {r["char_key"]: r["dup_count"] for r in rows}
+    cards = [c for k in owned if (c := get_card(k))]
     if not cards:
         await interaction.followup.send(
             f"{user.mention} chưa có thẻ nào để đánh! (quay gacha trước đi 🎴)",
@@ -161,10 +161,11 @@ async def _begin_selection(interaction, session: PVPSession, side: str):
         )
         pending_challenges.discard(_challenge_key(session.challenger.id, session.target.id))
         return
+    cards.sort(key=lambda c: (not c["rarity"].startswith("5"), c["rarity"], c["name"]))
     max_pick = min(PVP_TEAM_SIZE, len(cards))
     options = [
         discord.SelectOption(
-            label=c["name"],
+            label=f"{c['name']}" + (f" x{owned[c['key']]}" if owned.get(c["key"], 1) > 1 else ""),
             value=c["key"],
             description=f"{ROLE_LABEL[c['role']]} • {c['element']}",
             emoji=ELEMENT_EMOJI.get(c["element"], "❔"),
@@ -173,7 +174,9 @@ async def _begin_selection(interaction, session: PVPSession, side: str):
     ]
     view = TeamSelectView(session, side, options, max_pick)
     msg = await interaction.followup.send(
-        f"{user.mention} chọn **{max_pick}** thẻ để lập đội:", view=view
+        f"{user.mention} chọn **{max_pick}** thẻ để lập đội "
+        f"(từ **{len(cards)}** thẻ đang có):",
+        view=view,
     )
     session.select_msgs.append(msg)
 
