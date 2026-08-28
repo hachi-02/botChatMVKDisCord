@@ -30,6 +30,7 @@ from .ranks import compute_elo, compute_elo_draw, START_RATING
 
 PVP_COLOR = 0x9B59B6
 pending_challenges = set()
+active_players = set()
 
 
 class PVPSession:
@@ -40,6 +41,7 @@ class PVPSession:
         self.a_cards = None
         self.b_cards = None
         self.done = False
+        self.cancelled = False
         self.select_msgs = []
 
 
@@ -56,16 +58,50 @@ def _challenge_key(a, b):
     return frozenset((a, b))
 
 
+def _release_session(session):
+    pending_challenges.discard(
+        _challenge_key(session.challenger.id, session.target.id)
+    )
+    active_players.discard(session.challenger.id)
+    active_players.discard(session.target.id)
+
+
+async def _cancel_team_select(session):
+    for m in session.select_msgs:
+        try:
+            await m.delete()
+        except Exception:
+            pass
+    try:
+        await session.channel.send(
+            f"⏳ Hết giờ chọn đội, trận giữa "
+            f"{session.challenger.mention} và {session.target.mention} đã hủy."
+        )
+    except Exception:
+        pass
+
+
 # ====================== CHALLENGE ======================
 class ChallengeView(discord.ui.View):
     def __init__(self, session: PVPSession):
         super().__init__(timeout=PVP_ACCEPT_TIMEOUT)
         self.session = session
+        self.message = None
 
     async def on_timeout(self):
-        pending_challenges.discard(_challenge_key(self.session.challenger.id, self.session.target.id))
+        if self.session.cancelled or self.session.done:
+            return
+        self.session.cancelled = True
+        _release_session(self.session)
         for item in self.children:
             item.disabled = True
+        try:
+            await self.message.edit(
+                content="⏳ Hết giờ chờ phản hồi, thách đấu đã tự hủy.",
+                view=self,
+            )
+        except Exception:
+            pass
 
     @discord.ui.button(label="⚔️ Chấp nhận", style=discord.ButtonStyle.primary)
     async def accept(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -74,12 +110,19 @@ class ChallengeView(discord.ui.View):
                 "Chỉ người được thách đấu mới được chấp nhận!", ephemeral=True
             )
             return
+        if self.session.cancelled or interaction.user.id not in active_players \
+                or self.session.challenger.id not in active_players:
+            await interaction.response.send_message(
+                "⏳ Thách đấu đã hết hạn/tự hủy rồi!", ephemeral=True
+            )
+            return
         for item in self.children:
             item.disabled = True
         await interaction.response.edit_message(
             content=f"✅ {self.session.target.mention} đã chấp nhận! Đang lập đội...",
             view=self,
         )
+        self.stop()
         await _begin_selection(interaction, self.session, "A")
 
     @discord.ui.button(label="❌ Từ chối", style=discord.ButtonStyle.danger)
@@ -89,13 +132,17 @@ class ChallengeView(discord.ui.View):
                 "Chỉ người được thách đấu mới được từ chối!", ephemeral=True
             )
             return
-        pending_challenges.discard(_challenge_key(self.session.challenger.id, self.session.target.id))
+        if self.session.cancelled or self.session.done:
+            return
+        self.session.cancelled = True
+        _release_session(self.session)
         for item in self.children:
             item.disabled = True
         await interaction.response.edit_message(
             content=f"❌ {self.session.target.mention} đã từ chối thách đấu.",
             view=self,
         )
+        self.stop()
         self.session.done = True
 
 
@@ -115,10 +162,20 @@ class TeamSelectView(discord.ui.View):
         self.add_item(select)
 
     async def on_timeout(self):
+        if self.session.cancelled or self.session.done:
+            return
+        self.session.cancelled = True
+        _release_session(self.session)
         for item in self.children:
             item.disabled = True
+        await _cancel_team_select(self.session)
 
     async def _on_select(self, interaction: discord.Interaction):
+        if self.session.cancelled or self.session.done:
+            await interaction.response.send_message(
+                "⏳ Trận đã bị hủy!", ephemeral=True
+            )
+            return
         expected = self.session.challenger.id if self.side == "A" else self.session.target.id
         if interaction.user.id != expected:
             await interaction.response.send_message(
@@ -134,6 +191,7 @@ class TeamSelectView(discord.ui.View):
         for item in self.children:
             item.disabled = True
         await interaction.response.edit_message(view=self)
+        self.stop()
         await interaction.followup.send(
             content=f"✅ {interaction.user.mention} đã chốt đội!",
             embeds=_team_preview_cards(interaction.user, chosen),
@@ -151,16 +209,20 @@ class TeamSelectView(discord.ui.View):
 
 
 async def _begin_selection(interaction, session: PVPSession, side: str):
+    if session.cancelled or session.done:
+        return
     user = session.challenger if side == "A" else session.target
     rows = await get_collection(user.id)
     owned = {r["char_key"]: r["dup_count"] for r in rows}
     cards = [c for k in owned if (c := get_card(k))]
     if not cards:
+        session.cancelled = True
+        _release_session(session)
         await interaction.followup.send(
             f"{user.mention} chưa có thẻ nào để đánh! (quay gacha trước đi 🎴)",
             ephemeral=True,
         )
-        pending_challenges.discard(_challenge_key(session.challenger.id, session.target.id))
+        await _cancel_team_select(session)
         return
     cards.sort(key=lambda c: (not c["rarity"].startswith("5"), c["rarity"], c["name"]))
     max_pick = min(PVP_TEAM_SIZE, len(cards))
@@ -398,7 +460,7 @@ class ControlPanelView(discord.ui.View):
 
 
 async def _resolve(session: PVPSession, interaction: discord.Interaction):
-    if session.done or not session.a_cards or not session.b_cards:
+    if session.cancelled or session.done or not session.a_cards or not session.b_cards:
         return
     pending_challenges.discard(_challenge_key(session.challenger.id, session.target.id))
     session.done = True
@@ -476,6 +538,8 @@ async def _notify_turn_log(battle: BattleSession):
 
 async def _finish_battle(battle: BattleSession, winner, surrender: bool = False):
     battle.done = True
+    active_players.discard(battle.a_user.id)
+    active_players.discard(battle.b_user.id)
     ra_row = await get_pvp_rating(battle.a_user.id)
     rb_row = await get_pvp_rating(battle.b_user.id)
     ra = ra_row["rating"]
@@ -696,6 +760,18 @@ async def start_pvp_challenge(message, bot):
     if key in pending_challenges:
         await message.channel.send("Đã có một thách đấu đang chờ giữa hai em! ⏳", reference=message)
         return
+    if message.author.id in active_players:
+        await message.channel.send(
+            "Em đang tham gia một trận PvP rồi (chọn đội/đang đánh)! Xong hẵng thách tiếp nhé 🐟",
+            reference=message,
+        )
+        return
+    if target.id in active_players:
+        await message.channel.send(
+            "Người đó đang bận một trận PvP rồi, đợi chút nhé! ⏳",
+            reference=message,
+        )
+        return
 
     rows_a = await get_collection(message.author.id)
     rows_b = await get_collection(target.id)
@@ -712,6 +788,8 @@ async def start_pvp_challenge(message, bot):
         return
 
     pending_challenges.add(key)
+    active_players.add(message.author.id)
+    active_players.add(target.id)
     session = PVPSession(message.author, target, message.channel)
 
     e = discord.Embed(
@@ -723,7 +801,9 @@ async def start_pvp_challenge(message, bot):
     e.set_author(name="Chị Cá 🐟 PvP")
     e.set_thumbnail(url=PVP_CHALLENGE_GIF)
     e.set_footer(text="Mỗi lượt: chọn thẻ + mục tiêu + hành động (Đánh thường/Skill/Ultimate) · SP chung team")
-    await message.channel.send(embed=e, view=ChallengeView(session), reference=message)
+    view = ChallengeView(session)
+    msg = await message.channel.send(embed=e, view=view, reference=message)
+    view.message = msg
 
 
 async def handle_pvp_rank(message, bot):
