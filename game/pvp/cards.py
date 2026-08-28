@@ -1,3 +1,5 @@
+import re
+
 CHARACTER_POOL = [
     # ===================== DPS =====================
     {"key": "skirk", "name": "Skirk", "url": "https://res.cloudinary.com/z2ffqaaf/image/upload/v1787824941/Skirk_Dynamic_Skin_hpmpgk.webp", "rarity": "5L", "role": "DPS", "element": "Hydro", "atk": 110, "hp": 190, "spd": 62, "crit_rate": 0.20, "crit_dmg": 1.8, "skill": {"name": "Vực Thẳm", "type": "AOE_DMG", "power": 0.60, "cost": 3}, "ultimate": {"name": "Vực Thẳm Tuyệt Kỹ", "type": "AOE_DMG", "power": 1.20}},
@@ -65,4 +67,12 @@ def get_card(key: str) -> dict:
     for c in CHARACTER_POOL:
         if c["key"] == key:
             return c
+    return None
+
+
+def find_card(text: str):
+    for token in re.findall(r"[a-z]+", text.lower()):
+        for c in CHARACTER_POOL:
+            if token == c["name"].lower() or token == c["key"]:
+                return c
     return None

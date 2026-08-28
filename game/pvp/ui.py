@@ -601,6 +601,44 @@ def _effect_desc(eff: dict) -> str:
     return eff.get("name", "Kỹ năng")
 
 
+def _card_info_embed(card, owned_count):
+    stars = "★★★★★" if card["rarity"].startswith("5") else "★★★★"
+    e = discord.Embed(
+        title=f"{ELEMENT_EMOJI.get(card['element'], '❔')} {card['name']} [{ROLE_LABEL[card['role']]}]",
+        color=PVP_COLOR,
+    )
+    try:
+        e.set_thumbnail(url=card["url"])
+    except Exception:
+        pass
+    e.add_field(
+        name=f"{stars} {element_name(card['element'])}",
+        value="\u200b",
+        inline=False,
+    )
+    e.add_field(
+        name=f"❤️ HP: {card['hp']} · ⚔️ ATK: {card['atk']} · ⚡ SPD: {card['spd']}",
+        value="\u200b",
+        inline=False,
+    )
+    e.add_field(name=f"🔥 Skill · {card['skill']['name']}", value=_effect_desc(card["skill"]), inline=False)
+    e.add_field(name=f"✨ Ultimate · {card['ultimate']['name']}", value=_effect_desc(card["ultimate"]), inline=False)
+    e.set_footer(text=f"💠 Đã sở hữu x{owned_count}")
+    return e
+
+
+async def handle_card_info(channel, author, card):
+    rows = await get_collection(author.id)
+    owned = {r["char_key"]: r["dup_count"] for r in rows}
+    count = owned.get(card["key"], 0)
+    if count == 0:
+        await channel.send(
+            f"🔒 Em chưa sở hữu **{card['name']}**! Quay gacha nè 🎴"
+        )
+        return
+    await channel.send(embed=_card_info_embed(card, count))
+
+
 def _team_preview_cards(user, cards) -> list:
     embeds = []
     for c in cards:

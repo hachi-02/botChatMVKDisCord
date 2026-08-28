@@ -38,7 +38,8 @@ from config import (
     COLLECTION_KEYWORDS,
     PVP_KEYWORDS,
 )
-from game.pvp.ui import start_pvp_challenge, handle_pvp_rank
+from game.pvp.ui import start_pvp_challenge, handle_pvp_rank, handle_card_info
+from game.pvp.cards import find_card
 from ai import ai, get_system_prompt, clean_ai_response
 from memory import add_message, get_history, remember_user, get_known_users
 from search import search_web
@@ -111,6 +112,7 @@ MENU_PAGES = [
             ("🎴 Gacha", "`chị cá` + `gacha` / `gacha 1` / `gacha 5` (50đ / 250đ)"),
             ("🗃️ Kho thẻ", "`chị cá` + `kho` (xem các thẻ đã có)"),
             ("⚔️ PvP", "`chị cá pvp @người_chơi` (3v3 turn-based, ELO)"),
+            ("ℹ️ Thông tin thẻ", "`chị cá skill tên` (vd: `chị cá skill skirk` — xem thẻ đã sở hữu)"),
         ],
     ),
 ]
@@ -806,6 +808,13 @@ async def on_message(message):
             await handle_pvp_rank(message, bot)
         else:
             await start_pvp_challenge(message, bot)
+        return
+
+    is_card_info = (
+        addressed and "skill" in content_lower and (card := find_card(content_lower)) is not None
+    )
+    if is_card_info:
+        await handle_card_info(message.channel, message.author, card)
         return
 
     if not bot_mentioned and not role_mentioned:
