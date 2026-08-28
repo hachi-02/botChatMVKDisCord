@@ -129,7 +129,8 @@ class TeamSelectView(discord.ui.View):
         await interaction.response.edit_message(view=self)
         await interaction.followup.send(
             content=f"✅ {interaction.user.mention} đã chốt đội!",
-            embed=_team_preview_embed(interaction.user, chosen),
+            embeds=_team_preview_cards(interaction.user, chosen),
+            ephemeral=True,
         )
         if self.side == "A":
             await _begin_selection(interaction, self.session, "B")
@@ -491,20 +492,54 @@ async def _finish_battle(battle: BattleSession, winner, surrender: bool = False)
 
 
 # ====================== EMBEDS ======================
-def _team_preview_embed(user, cards):
-    e = discord.Embed(title=f"🎴 Đội của {user.display_name}", color=PVP_COLOR)
-    if cards:
-        e.set_thumbnail(url=cards[0]["url"])
+def _effect_desc(eff: dict) -> str:
+    t = eff.get("type")
+    p = eff.get("power", 0)
+    p2 = eff.get("power2", 0)
+    if t == "ST_DMG":
+        return f"Gây sát thương đơn mục tiêu (~x{p:.2f} ATK)"
+    if t == "AOE_DMG":
+        return f"Gây sát thương toàn bộ địch (~x{p:.2f} ATK)"
+    if t == "SHIELD_TEAM":
+        return f"Toàn đội giáp chặn +{int(p*100)}%"
+    if t == "HEAL":
+        return f"Hồi {p} HP cho đồng đội thấp máu nhất"
+    if t == "BUFF_ATK":
+        return f"Toàn đội +{int(p*100)}% ATK"
+    if t == "BUFF_SPD":
+        return f"Toàn đội +{p} tốc độ"
+    if t == "DEBUFF_DEF":
+        return f"Địch nhận thêm +{int(p*100)}% sát thương"
+    if t == "STUN":
+        return "Choáng mục tiêu 1 lượt"
+    if t == "SHIELD_HEAL":
+        return f"Giáp chặn +{int(p*100)}% và hồi {p2} HP đồng đội thấp máu"
+    if t == "HEAL_ST_DMG":
+        return f"Hồi {p} HP đồng đội thấp máu và gây sát thương đơn mục tiêu"
+    if t == "HEAL_BUFF":
+        return f"Hồi {p} HP đồng đội thấp máu và toàn đội +{int(p2*100)}% ATK"
+    return eff.get("name", "Kỹ năng")
+
+
+def _team_preview_cards(user, cards) -> list:
+    embeds = []
     for c in cards:
-        e.add_field(
-            name=f"{ELEMENT_EMOJI.get(c['element'],'❔')} {c['name']} "
-                  f"[{ROLE_LABEL[c['role']]}]",
-            value=f"⚔️ ATK {c['atk']} · ❤️ HP {c['hp']} · 💨 SPD {c['spd']}\n"
-                  f"💥 CRIT {int(c['crit_rate']*100)}% / x{c['crit_dmg']} · "
-                  f"🔮 {c['skill']['name']}",
-            inline=True,
+        e = discord.Embed(
+            title=f"{ELEMENT_EMOJI.get(c['element'],'❔')} {c['name']} [{ROLE_LABEL[c['role']]}]",
+            color=PVP_COLOR,
+            description=f"Đội hình của **{user.display_name}**",
         )
-    return e
+        try:
+            e.set_image(url=c["url"])
+        except Exception:
+            pass
+        e.add_field(name="❤️ HP", value=str(c["hp"]), inline=True)
+        e.add_field(name="⚔️ ATK", value=str(c["atk"]), inline=True)
+        e.add_field(name="🎯 Vai trò", value=ROLE_LABEL[c["role"]], inline=True)
+        e.add_field(name=f"🔥 Skill · {c['skill']['name']}", value=_effect_desc(c["skill"]), inline=False)
+        e.add_field(name=f"✨ Ultimate · {c['ultimate']['name']}", value=_effect_desc(c["ultimate"]), inline=False)
+        embeds.append(e)
+    return embeds
 
 
 def _sp_of_team(battle, team):
