@@ -20,6 +20,7 @@ from db import (
 )
 from .cards import (
     get_card,
+    element_name,
     ROLE_LABEL,
     ROLE_COLOR,
     ELEMENT_EMOJI,
@@ -167,7 +168,7 @@ async def _begin_selection(interaction, session: PVPSession, side: str):
         discord.SelectOption(
             label=f"{c['name']} ({'5★' if c['rarity'].startswith('5') else '4★'})",
             value=c["key"],
-            description=f"{ROLE_LABEL[c['role']]} • {c['element']}",
+            description=f"{ROLE_LABEL[c['role']]} • {element_name(c['element'])}",
             emoji=ELEMENT_EMOJI.get(c["element"], "❔"),
         )
         for c in cards
@@ -217,7 +218,7 @@ class ControlPanelView(discord.ui.View):
                 min_values=1, max_values=1,
                 options=[discord.SelectOption(
                     label=f.name, value=f.key,
-                    description=f"{ROLE_LABEL[f.role]} • {f.element}",
+                    description=f"{ROLE_LABEL[f.role]} • {element_name(f.element)}",
                     emoji=ELEMENT_EMOJI.get(f.element, "❔"),
                 ) for f in chars],
             )

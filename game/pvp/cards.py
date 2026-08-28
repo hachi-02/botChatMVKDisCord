@@ -38,6 +38,15 @@ ELEMENT_EMOJI = {
     "Anemo": "🌪️", "Geo": "🪨", "Dendro": "🌿",
 }
 
+ELEMENT_VI = {
+    "Pyro": "Hỏa", "Hydro": "Thủy", "Cryo": "Băng", "Electro": "Lôi",
+    "Anemo": "Phong", "Geo": "Nham", "Dendro": "Thảo",
+}
+
+
+def element_name(elem: str) -> str:
+    return ELEMENT_VI.get(elem, elem)
+
 # attacker_element -> set các element bị khắc (nhận x1.5)
 ELEMENT_ADVANTAGE = {
     "Pyro": {"Cryo", "Dendro"},
