@@ -190,6 +190,7 @@ class BattleSession:
         self.sp_b = PVP_SP_START
         self.round = 1
         self.log = []
+        self._img_ok = False
         self.message = None
         self.turn_log_msg = None
         self.done = False

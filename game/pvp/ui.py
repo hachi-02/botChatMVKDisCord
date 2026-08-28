@@ -28,6 +28,7 @@ from .cards import (
 )
 from .engine import BattleSession
 from .ranks import compute_elo, compute_elo_draw, START_RATING
+from .battle_image import prepare_battle_image, render_battle_image
 
 PVP_COLOR = 0x9B59B6
 pending_challenges = set()
@@ -564,9 +565,14 @@ async def _resolve(session: PVPSession, interaction: discord.Interaction):
     anim = discord.Embed(title="⚔️ Bắt đầu!", color=PVP_COLOR)
     anim.set_image(url=PVP_BATTLE_ANIM_GIF)
     anim_msg = await interaction.followup.send(embed=anim)
+    img_task = asyncio.create_task(prepare_battle_image(battle))
     await asyncio.sleep(2.5)
     try:
         await anim_msg.delete()
+    except Exception:
+        pass
+    try:
+        await img_task
     except Exception:
         pass
 
@@ -593,8 +599,16 @@ async def _post_panel(battle: BattleSession):
             await _finish_battle(battle, w if w is not False else None)
             return
     embed = _battle_embed(battle)
+    kwargs = {"embed": embed, "view": ControlPanelView(battle)}
+    if battle._img_ok:
+        try:
+            kwargs["files"] = [discord.File(render_battle_image(battle), filename="battle.png")]
+        except Exception as e:
+            print("LỖI RENDER_IMAGE:", e, flush=True)
+            battle._img_ok = False
+            kwargs["embed"] = _battle_embed(battle)
     try:
-        await battle.message.edit(embed=embed, view=ControlPanelView(battle))
+        await battle.message.edit(**kwargs)
     except Exception as e:
         print("LỖI POST_PANEL:", e, flush=True)
 
@@ -669,8 +683,14 @@ async def _finish_battle(battle: BattleSession, winner, surrender: bool = False)
         await update_pvp_result(win_user.id, lose_user.id, w_new, l_new, draw)
 
     embed = _result_embed(battle, ra, na, rb, nb, win_user, lose_user, draw, surrender)
+    kwargs = {"embed": embed, "view": None}
+    if battle._img_ok:
+        try:
+            kwargs["files"] = [discord.File(render_battle_image(battle), filename="battle.png")]
+        except Exception:
+            pass
     try:
-        await battle.message.edit(embed=embed, view=None)
+        await battle.message.edit(**kwargs)
     except Exception as e:
         print("LỖI FINISH_BATTLE:", e, flush=True)
 
@@ -806,20 +826,23 @@ def _battle_embed(battle: BattleSession):
     except Exception:
         e.set_author(name=f"ĐẾN LƯỢT: {owner.display_name.upper()}")
     sp = battle.sp_a if battle.active_team == "A" else battle.sp_b
-    e.add_field(
-        name=f"🔵 ĐỘI HÌNH CỦA {battle.a_user.display_name.upper()}",
-        value=f"🔋 SP {_sp_of_team(battle, 'A')}/{PVP_SP_MAX}",
-        inline=False,
-    )
-    for f in battle.team_a:
-        _fighter_field(e, f)
-    e.add_field(
-        name=f"🔴 ĐỘI HÌNH CỦA {battle.b_user.display_name.upper()}",
-        value=f"🔋 SP {_sp_of_team(battle, 'B')}/{PVP_SP_MAX}",
-        inline=False,
-    )
-    for f in battle.team_b:
-        _fighter_field(e, f)
+    if battle._img_ok:
+        e.set_image(url="attachment://battle.png")
+    else:
+        e.add_field(
+            name=f"🔵 ĐỘI HÌNH CỦA {battle.a_user.display_name.upper()}",
+            value=f"🔋 SP {_sp_of_team(battle, 'A')}/{PVP_SP_MAX}",
+            inline=False,
+        )
+        for f in battle.team_a:
+            _fighter_field(e, f)
+        e.add_field(
+            name=f"🔴 ĐỘI HÌNH CỦA {battle.b_user.display_name.upper()}",
+            value=f"🔋 SP {_sp_of_team(battle, 'B')}/{PVP_SP_MAX}",
+            inline=False,
+        )
+        for f in battle.team_b:
+            _fighter_field(e, f)
     e.add_field(
         name="🎯 Đến lượt",
         value=f"{battle._owner_active().mention} — 🔋 SP {sp}/{PVP_SP_MAX}\n"
