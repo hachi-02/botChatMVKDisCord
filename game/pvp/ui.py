@@ -957,29 +957,29 @@ async def start_pvp_challenge(message, bot):
     if target is None:
         await message.channel.send(
             "Em cần mention người muốn thách đấu: `chị cá pvp @người_chơi` 🐟",
-            reference=message,
+            reference=message, mention_author=False,
         )
         return
     if target.bot:
-        await message.channel.send("Không thể thách đấu bot! 🐟", reference=message)
+        await message.channel.send("Không thể thách đấu bot! 🐟", reference=message, mention_author=False)
         return
     if target.id == message.author.id:
-        await message.channel.send("Em không thể tự thách đấu chính mình 😅", reference=message)
+        await message.channel.send("Em không thể tự thách đấu chính mình 😅", reference=message, mention_author=False)
         return
     key = _challenge_key(message.author.id, target.id)
     if key in pending_challenges:
-        await message.channel.send("Đã có một thách đấu đang chờ giữa hai em! ⏳", reference=message)
+        await message.channel.send("Đã có một thách đấu đang chờ giữa hai em! ⏳", reference=message, mention_author=False)
         return
     if message.author.id in active_players:
         await message.channel.send(
             "Em đang tham gia một trận PvP rồi (chọn đội/đang đánh)! Xong hẵng thách tiếp nhé 🐟",
-            reference=message,
+            reference=message, mention_author=False,
         )
         return
     if target.id in active_players:
         await message.channel.send(
             "Người đó đang bận một trận PvP rồi, đợi chút nhé! ⏳",
-            reference=message,
+            reference=message, mention_author=False,
         )
         return
 
@@ -989,14 +989,14 @@ async def start_pvp_challenge(message, bot):
         await message.channel.send(
             f"{message.author.mention} cần ít nhất **{PVP_TEAM_SIZE}** thẻ để đấu "
             f"(hiện có {len(rows_a)} thẻ)! Quay gacha nữa nè 🎴",
-            reference=message,
+            reference=message, mention_author=False,
         )
         return
     if len(rows_b) < PVP_TEAM_SIZE:
         await message.channel.send(
             f"{target.mention} cần ít nhất **{PVP_TEAM_SIZE}** thẻ để đấu "
             f"(hiện có {len(rows_b)} thẻ) 🎴",
-            reference=message,
+            reference=message, mention_author=False,
         )
         return
 
@@ -1015,7 +1015,7 @@ async def start_pvp_challenge(message, bot):
     e.set_thumbnail(url=PVP_CHALLENGE_GIF)
     e.set_footer(text="Mỗi lượt: chọn thẻ + mục tiêu + hành động (Đánh thường/Skill/Ultimate) · SP chung team")
     view = ChallengeView(session)
-    msg = await message.channel.send(embed=e, view=view, reference=message)
+    msg = await message.channel.send(embed=e, view=view, reference=message, mention_author=False)
     view.message = msg
 
 
@@ -1038,7 +1038,7 @@ async def handle_pvp_rank(message, bot):
                     value=f"⭐ ELO **{r['rating']}** · {r['wins']}W/{r['losses']}L",
                     inline=False,
                 )
-        await message.channel.send(embed=e, reference=message)
+        await message.channel.send(embed=e, reference=message, mention_author=False)
         return
 
     target = message.mentions[0] if message.mentions else message.author
@@ -1053,4 +1053,4 @@ async def handle_pvp_rank(message, bot):
     e.add_field(name="Thắng", value=f"{wins}", inline=True)
     e.add_field(name="Thua", value=f"{losses}", inline=True)
     e.set_footer(text="Thắng +ELO, thua -ELO (K=32)")
-    await message.channel.send(embed=e, reference=message)
+    await message.channel.send(embed=e, reference=message, mention_author=False)

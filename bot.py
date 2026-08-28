@@ -362,7 +362,7 @@ async def handle_event_creation(message) -> bool:
     is_help = any(kw in content_lower for kw in EVENT_HELP_KEYWORDS)
 
     if is_help or not raw:
-        await message.channel.send(embed=_event_help_embed(bot), reference=message)
+        await message.channel.send(embed=_event_help_embed(bot), reference=message, mention_author=False)
         return True
 
     if "|" not in raw:
@@ -371,7 +371,7 @@ async def handle_event_creation(message) -> bool:
     parts = [p.strip() for p in raw.split("|") if p.strip()]
 
     if len(parts) < 2:
-        await message.channel.send(embed=_event_help_embed(bot), reference=message)
+        await message.channel.send(embed=_event_help_embed(bot), reference=message, mention_author=False)
         return True
 
     name = parts[0]
@@ -385,7 +385,7 @@ async def handle_event_creation(message) -> bool:
         await message.channel.send(
             "Chị chưa hiểu thời gian sự kiện, hoặc thời gian đã qua!\n"
             "**Ví dụ thời gian:** `ngày mai 20h`, `25/12 19h30`, `7h`, `30 phút nữa` 🐟",
-            reference=message,
+            reference=message, mention_author=False,
         )
         return True
 
@@ -431,7 +431,7 @@ async def handle_event_creation(message) -> bool:
         print(f"LỖI CREATE EVENT: {type(e).__name__}: {e}", flush=True)
         await message.channel.send(
             f"Chị không tạo được sự kiện 😭 Lỗi: `{type(e).__name__}: {e}`",
-            reference=message,
+            reference=message, mention_author=False,
         )
         return True
 
@@ -464,7 +464,7 @@ async def handle_event_creation(message) -> bool:
         inline=False,
     )
     e.set_footer(text=f"✅ Đã tạo sự kiện • {message.author.display_name} tạo")
-    await message.channel.send(embed=e, reference=message)
+    await message.channel.send(embed=e, reference=message, mention_author=False)
 
     event_queue.append(
         {
@@ -533,7 +533,7 @@ async def on_message(message):
     )
     if is_general_help:
         await message.channel.send(
-            embed=_menu_embed(bot, 0), view=MenuView(bot), reference=message
+            embed=_menu_embed(bot, 0), view=MenuView(bot), reference=message, mention_author=False
         )
         return
 
@@ -554,21 +554,21 @@ async def on_message(message):
             )
             await message.channel.send(
                 f"🔗 Lời mời vào server: {invite.url}\n(Link hiệu lực 7 ngày)",
-                reference=message,
+                reference=message, mention_author=False,
             )
         except Exception as e:
             print(f"LỖI CREATE INVITE: {type(e).__name__}: {e}", flush=True)
             await message.channel.send(
                 "Chị không tạo được lời mời 😭 (bot thiếu quyền **Create Instant Invite** "
                 "hoặc kênh không cho phép tạo invite).",
-                reference=message,
+                reference=message, mention_author=False,
             )
         return
 
     if addressed:
         is_member_list = any(kw in content_lower for kw in MEMBER_KEYWORDS)
         if is_member_list and message.guild:
-            await message.channel.send(embed=_member_list_embed(message, bot), reference=message)
+            await message.channel.send(embed=_member_list_embed(message, bot), reference=message, mention_author=False)
             return
 
         is_poll = any(kw in content_lower for kw in POLL_KEYWORDS)
@@ -582,7 +582,7 @@ async def on_message(message):
                 await message.channel.send(
                     "Em viết chưa đúng format rồi. "
                     "Gõ: `vote Câu hỏi? | chọn 1 | chọn 2` (phân tách bằng `|`) 🐟",
-                    reference=message,
+                    reference=message, mention_author=False,
                 )
                 return
 
@@ -627,7 +627,7 @@ async def on_message(message):
                     "• `nhắc em ngày mai 8h30 dậy`\n"
                     "• `nhắc em 25/12 đi chợ`\n\n"
                     "💡Chỉ cần nói thời gian + việc cần nhắc là được!",
-                    reference=message,
+                    reference=message, mention_author=False,
                 )
                 return
 
@@ -667,7 +667,7 @@ async def on_message(message):
 
             await message.channel.send(
                 f"OK em, {time_str} nữa chị sẽ nhắc: **{task}** 🐟",
-                reference=message,
+                reference=message, mention_author=False,
             )
             return
 
@@ -719,7 +719,7 @@ async def on_message(message):
             print(f"LỖI SUMMARY FETCH: {type(e).__name__}: {e}", flush=True)
             await message.channel.send(
                 "Chị không lấy được lịch sử kênh 😭 (bot cần quyền **Read Message History**).",
-                reference=message,
+                reference=message, mention_author=False,
             )
             return
 
@@ -741,7 +741,7 @@ async def on_message(message):
         if not transcript.strip():
             await message.channel.send(
                 "Chị không thấy tin nhắn nào trước đó trong kênh này để tóm tắt 🐟",
-                reference=message,
+                reference=message, mention_author=False,
             )
             return
 
@@ -763,11 +763,11 @@ async def on_message(message):
             summary = clean_ai_response(response.choices[0].message.content or "")
             if len(summary) > 2000:
                 summary = summary[:1997] + "..."
-            await message.channel.send(summary, reference=message)
+            await message.channel.send(summary, reference=message, mention_author=False)
         except Exception as e:
             print(f"LỖI SUMMARY: {type(e).__name__}: {e}", flush=True)
             await message.channel.send(
-                "Chị tóm tắt hơi trục trặc rồi 😭", reference=message
+                "Chị tóm tắt hơi trục trặc rồi 😭", reference=message, mention_author=False
             )
         return
 
@@ -776,7 +776,7 @@ async def on_message(message):
         if is_in_pvp(message.author.id):
             await message.channel.send(
                 "Em đang trong trận PvP, xong trận mới quay gacha được nhé 🐟",
-                reference=message,
+                reference=message, mention_author=False,
             )
             return
         cl = message.content.lower()
@@ -870,7 +870,7 @@ async def on_message(message):
 
     is_member_list = any(kw in content_lower for kw in MEMBER_KEYWORDS)
     if is_member_list and message.guild:
-        await message.channel.send(embed=_member_list_embed(message, bot), reference=message)
+        await message.channel.send(embed=_member_list_embed(message, bot), reference=message, mention_author=False)
         return
 
     # =========================
@@ -886,7 +886,7 @@ async def on_message(message):
         print(f"KẾT QUẢ TÌM KIỂM: {search_results[:200]}...", flush=True)
 
     if not prompt:
-        await message.channel.send("M gọi Chị Cá đó hả? 🐟", reference=message)
+        await message.channel.send("M gọi Chị Cá đó hả? 🐟", reference=message, mention_author=False)
         return
 
     channel_id = message.channel.id
@@ -950,20 +950,20 @@ async def on_message(message):
                 await message.channel.send(
                     "Câu này hơi dài, chị bị cắt ngang lúc đang trả lời rồi 😅 "
                     "em hỏi ngắn gọn lại giúp chị nhé.",
-                    reference=message,
+                    reference=message, mention_author=False,
                 )
             else:
                 await message.channel.send(
-                    "Chị Cá không biết trả lời sao 😅", reference=message
+                    "Chị Cá không biết trả lời sao 😅", reference=message, mention_author=False
                 )
             return
 
         print(f"AI: {answer}", flush=True)
 
-        await message.channel.send(answer, reference=message)
+        await message.channel.send(answer, reference=message, mention_author=False)
 
         add_message(channel_id, "assistant", answer)
 
     except Exception as e:
         print(f"LỖI AI: {type(e).__name__}: {e}", flush=True)
-        await message.channel.send("Chị Cá bị lỗi khi gọi AI rồi 😭", reference=message)
+        await message.channel.send("Chị Cá bị lỗi khi gọi AI rồi 😭", reference=message, mention_author=False)

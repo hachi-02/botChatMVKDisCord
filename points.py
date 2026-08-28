@@ -72,7 +72,7 @@ async def handle_points(message, bot):
         if not rows:
             embed.description = "Hãy chat (tin nhắn ≥ 5 ký tự) để nhận điểm nhé! Mỗi tin ~30s được +10đ."
             embed.set_footer(text="Chưa có ai tích điểm • Tích điểm mỗi tin nhắn")
-            await message.channel.send(embed=embed, reference=message)
+            await message.channel.send(embed=embed, reference=message, mention_author=False)
             return
         medals = {1: "🥇", 2: "🥈", 3: "🥉"}
         total = 0
@@ -92,7 +92,7 @@ async def handle_points(message, bot):
             )
         now = datetime.now(ZoneInfo("Asia/Ho_Chi_Minh")).strftime("%H:%M %d/%m")
         embed.set_footer(text=f"📊 Tổng {total}đ • Cập nhật {now}")
-        await message.channel.send(embed=embed, reference=message)
+        await message.channel.send(embed=embed, reference=message, mention_author=False)
         return
 
     target = message.mentions[0] if message.mentions else message.author
@@ -114,4 +114,4 @@ async def handle_points(message, bot):
     )
     icon = message.guild.icon.url if (message.guild and message.guild.icon) else discord.Embed.Empty
     embed.set_footer(text="Tích điểm mỗi tin nhắn • +10đ / 30s", icon_url=icon)
-    await message.channel.send(embed=embed, reference=message)
+    await message.channel.send(embed=embed, reference=message, mention_author=False)
