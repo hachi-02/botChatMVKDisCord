@@ -114,7 +114,7 @@ def _apply_effect(caster: Fighter, team: list, enemy: list, eff: dict, log: list
     elif t == "BUFF_SPD":
         for ally in team:
             ally.spd += p
-        log.append(f"{tag}: toàn đội +{p} né 💨")
+        log.append(f"{tag}: toàn đội +{p} SPD")
     elif t == "DEBUFF_DEF":
         for e in enemy:
             e.def_debuff += p

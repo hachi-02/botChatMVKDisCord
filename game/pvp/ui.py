@@ -9,7 +9,6 @@ from config import (
     PVP_TURN_TIMEOUT,
     PVP_ENERGY_MAX,
     PVP_SP_MAX,
-    PVP_DODGE_FACTOR,
     PVP_START_RATING,
     PVP_BATTLE_ANIM_GIF,
     PVP_CHALLENGE_GIF,
@@ -756,7 +755,7 @@ def _effect_desc(eff: dict) -> str:
     if t == "BUFF_ATK":
         return f"Toàn đội +{int(p*100)}% ATK"
     if t == "BUFF_SPD":
-        return f"Toàn đội +{p} kim né 💨"
+        return f"Toàn đội +{p} SPD"
     if t == "DEBUFF_DEF":
         return f"Địch nhận thêm +{int(p*100)}% sát thương"
     if t == "STUN":
@@ -786,7 +785,7 @@ def _card_info_embed(card, owned_count):
         inline=False,
     )
     e.add_field(
-        name=f"❤️ HP: {card['hp']} · ⚔️ ATK: {card['atk']} · 💨 Né: ~{card['spd'] * PVP_DODGE_FACTOR:.0f}%",
+        name=f"❤️ HP: {card['hp']} · ⚔️ ATK: {card['atk']} · 💨 SPD: {card['spd']}",
         value="\u200b",
         inline=False,
     )
@@ -819,7 +818,7 @@ def _team_preview_cards(user, cards) -> list:
             e.set_thumbnail(url=c["url"])
         except Exception:
             pass
-        e.add_field(name=f"❤️ HP: {c['hp']} · ⚔️ ATK: {c['atk']}", value="\u200b", inline=False)
+        e.add_field(name=f"❤️ HP: {c['hp']} · ⚔️ ATK: {c['atk']} · 💨 SPD: {c['spd']}", value="\u200b", inline=False)
         e.add_field(name=f"🔥 Skill · {c['skill']['name']}", value=_effect_desc(c["skill"]), inline=False)
         e.add_field(name=f"✨ Ultimate · {c['ultimate']['name']}", value=_effect_desc(c["ultimate"]), inline=False)
         embeds.append(e)
