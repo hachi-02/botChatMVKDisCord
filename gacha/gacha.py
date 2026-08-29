@@ -171,13 +171,13 @@ class GachaView(discord.ui.View):
         self.btn_1 = discord.ui.Button(
             label="🎯 Quay 1 lần (50❖)",
             style=discord.ButtonStyle.primary,
-            callback=lambda i: self._run(i, 1),
         )
+        self.btn_1.callback = lambda i: self._run(i, 1)
         self.btn_5 = discord.ui.Button(
             label="🎯 Quay 5 lần (250❖)",
             style=discord.ButtonStyle.success,
-            callback=lambda i: self._run(i, 5),
         )
+        self.btn_5.callback = lambda i: self._run(i, 5)
         self.add_item(self.btn_1)
         self.add_item(self.btn_5)
 
