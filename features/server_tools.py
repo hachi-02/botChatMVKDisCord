@@ -32,6 +32,7 @@ MENU_PAGES = [
             ("📅 Điểm danh", "`chica daily` (mỗi ngày +10💠 +500🪙)"),
             ("📅 Sự kiện", "`chica make event Tên | thời gian | mô tả | địa điểm`"),
             ("🔗 Lời mời", "`chica link`"),
+            ("🎧 Kênh thoại", "`chica voice in` / `chica voice out`"),
         ],
     ),
     (
@@ -43,8 +44,6 @@ MENU_PAGES = [
             ("⚔️ PvP", "`chica pvp @người_chơi` (3v3 turn-based, ELO)"),
             ("🏆 Xếp hạng PvP", "`chica pvp point` / `chica pvp top`"),
             ("ℹ️ Thông tin thẻ", "`chica info + tên` (vd: `chica info skirk` — xem thẻ đã sở hữu)"),
-            ("🖼️ Ảnh nhân vật", "`chica show + tên` (vd: `chica show kazuha` — hiện GIF/ảnh)"),
-            ("🎧 Kênh thoại", "`chica voice in` / `chica voice out`"),
         ],
     ),
 ]
