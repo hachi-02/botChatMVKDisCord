@@ -251,36 +251,60 @@ async def handle_chat(message, bot) -> bool:
         # Prompt hệ thống cá nhân hóa theo người gọi + danh sách người đã biết
         system_prompt = get_system_prompt(sender_name, get_known_users())
 
-        # Gọi AI (chạy nền bằng to_thread để không chặn bot)
-        async with message.channel.typing():
-            response = await asyncio.to_thread(
-                ai.chat.completions.create,
-                model=MODEL_NAME,
-                reasoning_effort="default",
-                max_tokens=4096,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": system_prompt,
-                    }
-                ]
-                + get_history(channel_id),   # Nối vào lịch sử hội thoại kênh
+        # Một câu trả lời "cụt" (chỉ vài ký tự / 1 ký tự rác) do model dừng sớm
+        # thường là lỗi cắt content (vd chỉ còn "M"). Ngưỡng này giúp nhận diện.
+        MIN_SANE_LEN = 4
+
+        answer = ""
+        finish_reason = None
+
+        # Thử tối đa RETRY_MAX lần; lần sau tăng max_tokens để model không bị cắt sớm.
+        RETRY_MAX = 2
+        for attempt in range(1, RETRY_MAX + 1):
+            current_max = 4096 if attempt == 1 else 6000
+
+            # Gọi AI (chạy nền bằng to_thread để không chặn bot)
+            async with message.channel.typing():
+                response = await asyncio.to_thread(
+                    ai.chat.completions.create,
+                    model=MODEL_NAME,
+                    reasoning_effort="default",
+                    max_tokens=current_max,
+                    messages=[
+                        {
+                            "role": "system",
+                            "content": system_prompt,
+                        }
+                    ]
+                    + get_history(channel_id),   # Nối vào lịch sử hội thoại kênh
+                )
+
+            ai_message = response.choices[0].message
+            finish_reason = response.choices[0].finish_reason
+            print("USAGE:", response.usage, flush=True)
+
+            print("AI RAW CONTENT:", repr(ai_message.content), flush=True)
+            print("FINISH REASON:", finish_reason, flush=True)
+
+            # Dòng suy luận (reasoning) nếu model có xuất — chỉ để log
+            reasoning_content = getattr(ai_message, "reasoning_content", None)
+            if reasoning_content:
+                print("AI REASONING:", repr(reasoning_content), flush=True)
+
+            answer = ai_message.content or ""
+            answer = clean_ai_response(answer)   # Dọn ký tự thừa / không hợp lệ
+
+            print(f"AI CLEAN (attempt {attempt}):", repr(answer), flush=True)
+
+            # Cụt khi: dừng sớm (stop) nhưng mới ra vài ký tự (không phải hết token length)
+            is_truncated = (
+                finish_reason != "length"
+                and len(answer.strip()) < MIN_SANE_LEN
             )
-
-        ai_message = response.choices[0].message
-        finish_reason = response.choices[0].finish_reason
-        print("USAGE:", response.usage, flush=True)
-
-        print("AI RAW CONTENT:", repr(ai_message.content), flush=True)
-        print("FINISH REASON:", finish_reason, flush=True)
-
-        # Dòng suy luận (reasoning) nếu model có xuất — chỉ để log
-        reasoning_content = getattr(ai_message, "reasoning_content", None)
-        if reasoning_content:
-            print("AI REASONING:", repr(reasoning_content), flush=True)
-
-        answer = ai_message.content or ""
-        answer = clean_ai_response(answer)   # Dọn ký tự thừa / không hợp lệ
+            if is_truncated and attempt < RETRY_MAX:
+                print(f"⚠️ Câu cụt (len={len(answer.strip())}), retry lần {attempt + 1}", flush=True)
+                continue
+            break
 
         # Map placeholder ngắn ([MEOW], [HEART], [SMILE], [ANGRY]) sang emoji thật
         for placeholder, emoji in EMOJI_MAP.items():
@@ -294,7 +318,7 @@ async def handle_chat(message, bot) -> bool:
         if answer and finish_reason == "length":
             answer = answer.rstrip() + "..."
 
-        print("AI CLEAN:", repr(answer), flush=True)
+        print("AI CLEAN (cuối):", repr(answer), flush=True)
 
         if len(answer) > 2000:   # Giới hạn độ dài tin Discord
             answer = answer[:1997] + "..."
@@ -311,6 +335,15 @@ async def handle_chat(message, bot) -> bool:
                 await message.channel.send(
                     "Chị Cá không biết trả lời sao 😅", reference=message, mention_author=False
                 )
+            return True
+
+        # Sau khi đã retry hết mà vẫn còn cụt (vd chỉ "M") -> không gửi rác nữa
+        if len(answer.strip()) < MIN_SANE_LEN:
+            print(f"⚠️ Vẫn cụt sau {RETRY_MAX} lần thử, không gửi rác 🐟", flush=True)
+            await message.channel.send(
+                "Chị Cá vừa trả lời bị cụt nên đã loại bỏ, em thử hỏi lại nhé 🐟",
+                reference=message, mention_author=False,
+            )
             return True
 
         print(f"AI: {answer}", flush=True)
