@@ -19,10 +19,11 @@ from config import (
     DAILY_KEYWORDS,
     GACHA_KEYWORDS,
     COLLECTION_KEYWORDS,
+    SHOW_KEYWORDS,
     PVP_KEYWORDS,
     PVP_RANK_KEYWORDS,
 )
-from game.pvp.ui import start_pvp_challenge, handle_pvp_rank, handle_card_info, is_in_pvp
+from game.pvp.ui import start_pvp_challenge, handle_pvp_rank, handle_card_info, handle_show_card, is_in_pvp
 from game.pvp.cards import find_card
 from web_server import start_web_server
 from db import init_db, get_gems
@@ -197,6 +198,15 @@ async def on_message(message):
     )
     if is_card_info:
         await handle_card_info(message.channel, message.author, card)
+        return
+
+    is_show = (
+        addressed
+        and any(kw in content_lower for kw in SHOW_KEYWORDS)
+        and (card := find_card(content_lower)) is not None
+    )
+    if is_show and card is not None:
+        await handle_show_card(message.channel, card)
         return
 
     if await handle_chat(message, bot):

@@ -93,6 +93,7 @@ POINTS_PER_LEVEL = 200
 
 GACHA_KEYWORDS = ["gacha", "quay", "roll"]
 COLLECTION_KEYWORDS = ["sở hữu", "collection", "kho", "bộ sưu tập"]
+SHOW_KEYWORDS = ["show", "xem ảnh", "ảnh"]
 
 PVP_KEYWORDS = ["pvp", "pk", "thách đấu"]
 PVP_RANK_KEYWORDS = ["điểm", "top"]

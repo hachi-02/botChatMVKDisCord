@@ -986,6 +986,34 @@ async def handle_card_info(channel, author, card):
     view.message = msg
 
 
+async def handle_show_card(channel, card):
+    stars = "★★★★★" if card["rarity"].startswith("5") else "★★★★"
+    kind = "Limited" if card["rarity"] == "5L" else ("Thường" if card["rarity"] == "5S" else "")
+    title = f"{ELEMENT_EMOJI.get(card['element'], '❔')} {card['name']} · {stars}"
+    if kind:
+        title += f" · 5★ {kind}"
+    e = discord.Embed(
+        title=title,
+        description=f"**{ROLE_LABEL[card['role']]}** · {element_name(card['element'])}",
+        color=PVP_COLOR,
+    )
+    e.add_field(
+        name=f"🔥 Skill · {card['skill']['name']}",
+        value=_effect_desc(card["skill"]),
+        inline=False,
+    )
+    e.add_field(
+        name=f"✨ Ultimate · {card['ultimate']['name']}",
+        value=_effect_desc(card["ultimate"]),
+        inline=False,
+    )
+    try:
+        e.set_image(url=card["url"])
+    except Exception:
+        pass
+    await channel.send(embed=e)
+
+
 def _team_preview_cards(user, cards) -> list:
     embeds = []
     for c in cards:
