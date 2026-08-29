@@ -26,7 +26,7 @@ from game.pvp.ui import start_pvp_challenge, handle_pvp_rank, handle_card_info, 
 from game.pvp.cards import find_card
 from web_server import start_web_server
 from db import init_db, get_gems
-from points import maybe_award_points, handle_assets, handle_daily, EMBED_COLOR
+from points import maybe_award_points, handle_assets, handle_daily
 from gacha.gacha import handle_gacha, handle_collection, GachaView
 from features.scheduler import (
     handle_event_creation,
@@ -163,14 +163,8 @@ async def on_message(message):
             await handle_gacha(message.channel, message.author, bot, n)
         else:
             pts = await get_gems(message.author.id)
-            e = discord.Embed(
-                title="🎰 Gacha Thẻ Genshin",
-                description=f"Nguyên thạch hiện có: **{pts}💠**\nChọn số lượt quay:",
-                color=EMBED_COLOR,
-            )
-            e.set_footer(text="1 lần = 50❖ • 5 lần = 250❖")
-            view = GachaView(bot, message.author)
-            g_msg = await message.channel.send(embed=e, view=view)
+            view = GachaView(bot, message.author, pts)
+            g_msg = await message.channel.send(view=view)
             view.message = g_msg
         return
 
