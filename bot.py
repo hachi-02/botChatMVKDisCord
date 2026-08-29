@@ -28,6 +28,7 @@ from features.server_tools import (
     handle_invite,
     handle_member_list,
     handle_poll,
+    handle_hug,
 )
 from features.chat import handle_chat, handle_summary
 from features.voice import handle_voice_join, handle_voice_leave
@@ -118,6 +119,10 @@ async def on_message(message):
 
         if t0 == "member":
             await handle_member_list(message, bot)
+            return
+
+        if t0 == "hug":
+            await handle_hug(message, bot)
             return
 
         if t0 == "search":

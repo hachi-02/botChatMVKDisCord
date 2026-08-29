@@ -5,9 +5,11 @@
 # =============================================
 
 import re
+import random
 
 import discord
 
+from config import HUG_GIFS
 from points import EMBED_COLOR
 
 # Bộ emoji số 1-10 dùng để gán cho các lựa chọn trong poll
@@ -33,6 +35,7 @@ MENU_PAGES = [
             ("📅 Sự kiện", "`chica make event Tên | thời gian | mô tả | địa điểm`"),
             ("🔗 Lời mời", "`chica link`"),
             ("🎧 Kênh thoại", "`chica voice in` / `chica voice out`"),
+            ("🤗 Ôm", "`chica hug @bạn` (tặng cái ôm kèm GIF)"),
         ],
     ),
     (
@@ -180,6 +183,19 @@ async def handle_invite(message, bot):
             "hoặc kênh không cho phép tạo invite).",
             reference=message, mention_author=False,
         )
+
+
+# Xử lý lệnh "ôm" (vd: `chica hug @bạn`). Gửi 1 message: text + GIF ngẫu nhiên.
+# Nếu không có @người nhận thì tự ôm bot.
+async def handle_hug(message, bot) -> bool:
+    target = message.mentions[0] if message.mentions else bot.user
+    gif = random.choice(HUG_GIFS)
+    await message.channel.send(
+        f"{message.author.mention} tặng cái ôm {target.mention} 🐟\n{gif}",
+        reference=message,
+        mention_author=False,
+    )
+    return True
 
 
 # Xử lý lệnh vote/poll (vd: `chị cá vote Đi ăn gì? | Phở | Bún`).

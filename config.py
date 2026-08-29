@@ -127,3 +127,10 @@ REPORT_MINUTE = 0
 REPORT_CHANNEL_NAMES = ["chat-chit"]
 REPORT_CHECK_INTERVAL = 60
 REPORT_KEEP_DAYS = 30
+
+HUG_GIFS = [
+    "https://res.cloudinary.com/z2ffqaaf/image/upload/v1788011690/giphy_dueiol.webp",
+    "https://res.cloudinary.com/z2ffqaaf/image/upload/v1788011662/200_d8iav6.webp",
+    "https://res.cloudinary.com/z2ffqaaf/image/upload/v1788011652/giphy_eldxvm.webp",
+    "https://res.cloudinary.com/z2ffqaaf/image/upload/v1788011638/giphy_i3k8aa.webp",
+]
