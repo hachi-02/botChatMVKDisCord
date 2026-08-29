@@ -1,3 +1,9 @@
+# =============================================
+# features/scheduler.py
+# Quản lý "nhắc hẹn giờ" (remind) và "sự kiện" (scheduled event).
+# Tách từ bot.py. Nhận `bot` qua tham số, KHÔNG import bot để tránh circular import.
+# =============================================
+
 import asyncio
 import re
 from datetime import datetime, timedelta
@@ -12,10 +18,11 @@ from config import (
 )
 from points import EMBED_COLOR
 
-remind_queue = []
-event_queue = []
+remind_queue = []   # Hàng đợi các lời nhắc: {user_id, channel_id, time, task}
+event_queue = []    # Hàng đợi các sự kiện: {event_id, name, time, channel_id, notified}
 
 
+# Tạo embed hướng dẫn cách dùng lệnh "tạo sự kiện".
 def _event_help_embed(bot):
     e = discord.Embed(title="📌 Tạo sự kiện", color=EMBED_COLOR)
     if bot.user:
@@ -42,9 +49,12 @@ def _event_help_embed(bot):
     return e
 
 
+# Bóc tách thời điểm nhắc từ câu chữ tiếng Việt.
+# Trả về một datetime (None nếu không hiểu). Ví dụ: "7h", "ngày mai 8h30",
+# "25/12 19h30", "30 phút nữa", "1 tiếng", "2 ngày", "10 giây"...
 def parse_remind_time(text: str):
     text = text.lower().strip()
-    now = datetime.now(ZoneInfo("Asia/Ho_Chi_Minh"))
+    now = datetime.now(ZoneInfo("Asia/Ho_Chi_Minh"))  # Múi giờ Việt Nam
 
     match = re.search(r"(?:ngày\s*mai|mai)\s+(\d{1,2})[h:](\d{2})", text)
     if match:
@@ -137,11 +147,14 @@ def parse_remind_time(text: str):
     return None
 
 
+# Vòng lặp nền: cứ 10 giây kiểm tra remind_queue, gửi lời nhắc khi đến giờ.
+# Đăng ký trong on_ready: bot.loop.create_task(remind_checker(bot))
 async def remind_checker(bot):
-    await bot.wait_until_ready()
+    await bot.wait_until_ready()       # Chờ bot kết nối xong mới chạy
     while not bot.is_closed():
         try:
             now = datetime.now(ZoneInfo("Asia/Ho_Chi_Minh"))
+            # Lấy các lời nhắc đã "đến giờ"
             ready_reminds = [r for r in remind_queue if r["time"] <= now]
             for r in ready_reminds:
                 remind_queue.remove(r)
@@ -159,11 +172,14 @@ async def remind_checker(bot):
         await asyncio.sleep(10)
 
 
+# Vòng lặp nền: cứ 30 giây kiểm tra event_queue, nhắc @everyone trước giờ bắt đầu.
+# Đăng ký trong on_ready: bot.loop.create_task(event_reminder_checker(bot))
 async def event_reminder_checker(bot):
     await bot.wait_until_ready()
     while not bot.is_closed():
         try:
             now = datetime.now(ZoneInfo("Asia/Ho_Chi_Minh"))
+            # Tìm sự kiện chưa được nhắc và còn trong khoảng "sắp bắt đầu"
             due = [
                 e
                 for e in event_queue
@@ -186,16 +202,20 @@ async def event_reminder_checker(bot):
         await asyncio.sleep(30)
 
 
+# Xử lý lệnh "nhắc" (vd: `chị cá nhắc em 7h học bài`).
+# Trả về True nếu đã xử lý hết (bot.py dừng lại), False nếu không phải lệnh này.
 async def handle_remind(message, bot) -> bool:
     raw = message.content
+    # Bỏ tiền tố "chị cá"/"chica" và từ "nhắc/remind" để lấy phần thời gian + việc
     raw = re.sub(r"(?i)^(chị\s*cá|chica)\s*", "", raw).strip()
     raw = re.sub(
         r"(?i)^(nhắc\s*(t|tôi|em|e|tui)|remind)\s*", "", raw
     ).strip()
 
     now = datetime.now(ZoneInfo("Asia/Ho_Chi_Minh"))
-    remind_time = parse_remind_time(raw)
+    remind_time = parse_remind_time(raw)   # Bóc thời điểm nhắc
     if not remind_time:
+        # Không hiểu thời gian -> gửi hướng dẫn
         await message.channel.send(
             "Chị chưa hiểu thời gian em muốn nhắc!\n"
             "**📌 Ví dụ cách dùng:**\n"
@@ -209,6 +229,7 @@ async def handle_remind(message, bot) -> bool:
         )
         return True
 
+    # Loại bỏ phần thời gian khỏi câu để giữ lại nội dung "việc cần nhắc"
     task = re.sub(
         r"(?:ngày\s*mai|mai)\s*\d+[h:]\d*\b", "", raw, flags=re.IGNORECASE
     ).strip()
@@ -223,8 +244,9 @@ async def handle_remind(message, bot) -> bool:
         flags=re.IGNORECASE,
     ).strip()
     if not task:
-        task = "đến giờ rồi"
+        task = "đến giờ rồi"   # Không có việc nào -> nhắc mặc định
 
+    # Đẩy lời nhắc vào hàng đợi để remind_checker xử lý
     remind_queue.append(
         {
             "user_id": message.author.id,
@@ -234,6 +256,7 @@ async def handle_remind(message, bot) -> bool:
         }
     )
 
+    # Tính khoảng thời gian còn lại để thông báo cho user
     diff = remind_time - now
     hours, remainder = divmod(int(diff.total_seconds()), 3600)
     minutes = remainder // 60
@@ -250,8 +273,11 @@ async def handle_remind(message, bot) -> bool:
     return True
 
 
+# Xử lý lệnh "tạo sự kiện" (vd: `chị cá tạo sự kiện Sinh nhật | ngày mai 20h | mô tả | địa điểm`).
+# Trả về True nếu đã xử lý hết, False nếu không phải lệnh tạo sự kiện (thiếu "|").
 async def handle_event_creation(message, bot) -> bool:
     raw = message.content
+    # Bỏ tiền tố gọi bot ("chị cá", "chica", ...) và từ khóa "tạo sự kiện"
     raw = re.sub(
         r"(?i)^(chị\s*cá|chica|chicá|chị ca|cá ơi|ca ơi|ê chị cá|ê chica|chị cá ơi|chica ơi)\s*",
         "",
@@ -262,6 +288,7 @@ async def handle_event_creation(message, bot) -> bool:
     ).strip()
 
     if bot.user:
+        # Xóa mention bot (<@id>) ra khỏi chuỗi để giữ phần nội dung
         raw = raw.replace(bot.user.mention, "")
         raw = raw.replace(f"<@{bot.user.id}>", "")
         raw = raw.replace(f"<@!{bot.user.id}>", "")
@@ -270,18 +297,22 @@ async def handle_event_creation(message, bot) -> bool:
     raw = raw.strip()
 
     content_lower = message.content.lower()
+    # Nếu user chỉ muốn xem hướng dẫn (có từ trợ giúp) hoặc không có nội dung
     is_help = any(kw in content_lower for kw in EVENT_HELP_KEYWORDS)
 
     if is_help or not raw:
         await message.channel.send(embed=_event_help_embed(bot), reference=message, mention_author=False)
         return True
 
+    # Dữ liệu sự kiện tách nhau bằng "|" -> nếu không có "|" thì không phải lệnh này
     if "|" not in raw:
         return False
 
+    # Tách: Tên | thời gian | mô tả | địa điểm
     parts = [p.strip() for p in raw.split("|") if p.strip()]
 
     if len(parts) < 2:
+        # Thiếu bắt buộc (Tên + thời gian) -> hiện hướng dẫn
         await message.channel.send(embed=_event_help_embed(bot), reference=message, mention_author=False)
         return True
 
@@ -290,9 +321,10 @@ async def handle_event_creation(message, bot) -> bool:
     description = parts[2] if len(parts) > 2 else ""
     location = parts[3] if len(parts) > 3 else ""
 
-    start_time = parse_remind_time(time_text)
+    start_time = parse_remind_time(time_text)   # Bóc thời gian bắt đầu
     now = datetime.now(ZoneInfo("Asia/Ho_Chi_Minh"))
     if not start_time or start_time <= now:
+        # Thời gian không hiểu hoặc đã qua -> báo lỗi
         await message.channel.send(
             "Chị chưa hiểu thời gian sự kiện, hoặc thời gian đã qua!\n"
             "**Ví dụ thời gian:** `ngày mai 20h`, `25/12 19h30`, `7h`, `30 phút nữa` 🐟",
@@ -300,12 +332,15 @@ async def handle_event_creation(message, bot) -> bool:
         )
         return True
 
+    # Sự kiện kéo dài mặc định (giờ mặc định) tính từ lúc bắt đầu
     end_time = start_time + timedelta(minutes=EVENT_DEFAULT_DURATION_MINUTES)
 
     guild = message.guild
     if not guild:
         return True
 
+    # Mặc định là sự kiện "ngoài" (external). Nếu địa điểm trùng tên voice channel
+    # thì chuyển thành sự kiện trong kênh voice (entity_type = voice).
     entity_type = discord.EntityType.external
     channel = None
     if location:
@@ -319,8 +354,9 @@ async def handle_event_creation(message, bot) -> bool:
             location = ""
 
     if entity_type == discord.EntityType.external and not location:
-        location = "Online"
+        location = "Online"   # Sự kiện ngoài không có nơi thì để "Online"
 
+    # Ghép tham số gọi API tạo sự kiện của Discord
     kwargs = dict(
         name=name,
         start_time=start_time,
@@ -337,6 +373,7 @@ async def handle_event_creation(message, bot) -> bool:
         kwargs["location"] = discord.utils.MISSING
 
     try:
+        # Gọi API Discord để tạo sự kiện trên server
         event = await guild.create_scheduled_event(**kwargs)
     except Exception as e:
         print(f"LỖI CREATE EVENT: {type(e).__name__}: {e}", flush=True)
@@ -346,6 +383,7 @@ async def handle_event_creation(message, bot) -> bool:
         )
         return True
 
+    # Hiển thị embed tổng kết sự kiện vừa tạo
     if entity_type == discord.EntityType.external:
         loc_text = location
     else:
@@ -377,6 +415,7 @@ async def handle_event_creation(message, bot) -> bool:
     e.set_footer(text=f"✅ Đã tạo sự kiện • {message.author.display_name} tạo")
     await message.channel.send(embed=e, reference=message, mention_author=False)
 
+    # Lưu vào hàng đợi để event_reminder_checker nhắc trước giờ bắt đầu
     event_queue.append(
         {
             "event_id": event.id,

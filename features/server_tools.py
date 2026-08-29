@@ -1,11 +1,19 @@
+# =============================================
+# features/server_tools.py
+# Các công cụ server: menu, danh sách thành viên, vote (poll), link mời.
+# Tách từ bot.py. Nhận `bot` qua tham số, không import bot (tránh circular import).
+# =============================================
+
 import re
 
 import discord
 
 from points import EMBED_COLOR, LEVELUP_GIF
 
+# Bộ emoji số 1-10 dùng để gán cho các lựa chọn trong poll
 NUMBER_EMOJIS = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"]
 
+# Nội dung menu điều hướng gồm nhiều trang. Mỗi trang = (tiêu đề, [(tên, mô tả), ...])
 MENU_PAGES = [
     (
         "💬 Trò chuyện & Thông tin",
@@ -40,6 +48,7 @@ MENU_PAGES = [
 ]
 
 
+# Tạo embed hiển thị menu ở trang `page` (chỉ dùng nội bộ).
 def _menu_embed(bot, page=0):
     title, items = MENU_PAGES[page]
     e = discord.Embed(title=f"Menu Chị Cá — {title}", color=EMBED_COLOR)
@@ -52,39 +61,46 @@ def _menu_embed(bot, page=0):
     return e
 
 
+# Giao diện menu có nút bấm ◀️/▶️ để chuyển trang (lắng nghe sự kiện tương tác).
 class MenuView(discord.ui.View):
     def __init__(self, bot):
         super().__init__(timeout=None)
         self.bot = bot
-        self.page = 0
+        self.page = 0   # Trang hiện tại
 
+    # Cập nhật lại embed theo trang hiện tại khi bấm nút
     async def _show(self, interaction):
         self.page_indicator.label = f"{self.page + 1}/{len(MENU_PAGES)}"
         await interaction.response.edit_message(
             embed=_menu_embed(self.bot, self.page), view=self
         )
 
+    # Nút lùi về trang trước (vòng lại trang cuối nếu đứng ở trang đầu)
     @discord.ui.button(label="◀️", style=discord.ButtonStyle.secondary)
     async def prev(self, interaction, button):
         self.page = (self.page - 1) % len(MENU_PAGES)
         await self._show(interaction)
 
+    # Nút chỉ thị số trang (dạng "1/3"), không làm gì khi bấm
     @discord.ui.button(label="1/1", style=discord.ButtonStyle.secondary, disabled=True)
     async def page_indicator(self, interaction, button):
         pass
 
+    # Nút qua trang kế tiếp (vòng lại trang đầu nếu ở trang cuối)
     @discord.ui.button(label="▶️", style=discord.ButtonStyle.secondary)
     async def next(self, interaction, button):
         self.page = (self.page + 1) % len(MENU_PAGES)
         await self._show(interaction)
 
 
+# Gửi menu (trang đầu + view có nút bấm) vào kênh.
 async def handle_menu(message, bot):
     await message.channel.send(
         embed=_menu_embed(bot, 0), view=MenuView(bot), reference=message, mention_author=False
     )
 
 
+# Tạo embed danh sách thành viên đang online (hiện tối đa 20 người + vai trò).
 def _member_list_embed(message, bot):
     guild = message.guild
     members = guild.members
@@ -96,7 +112,7 @@ def _member_list_embed(message, bot):
     if guild.icon:
         e.set_thumbnail(url=guild.icon.url)
     e.description = f"**{online_count}/{total}** thành viên đang online"
-    for m in online[:20]:
+    for m in online[:20]:   # Chỉ liệt kê 20 người đầu để tránh embed quá dài
         role = m.top_role.name if m.top_role.name != "@everyone" else ""
         status = "🟢" if m.status == discord.Status.online else "🟡"
         e.add_field(name=f"{status} {m.display_name}", value=role or "—", inline=True)
@@ -105,17 +121,19 @@ def _member_list_embed(message, bot):
     return e
 
 
+# Gửi danh sách thành viên online vào kênh.
 async def handle_member_list(message, bot):
     await message.channel.send(
         embed=_member_list_embed(message, bot), reference=message, mention_author=False
     )
 
 
+# Tạo link mời trực tiếp trong kênh hiện tại (hiệu lực 7 ngày, không giới hạn lượt).
 async def handle_invite(message, bot):
     try:
         invite = await message.channel.create_invite(
-            max_age=604800,
-            max_uses=0,
+            max_age=604800,   # 7 ngày (604800 giây)
+            max_uses=0,       # 0 = không giới hạn số lần dùng
             unique=True,
             reason="Tạo lời mời bởi Chị Cá",
         )
@@ -124,6 +142,7 @@ async def handle_invite(message, bot):
             reference=message, mention_author=False,
         )
     except Exception as e:
+        # Thiếu quyền Create Instant Invite thường là nguyên nhân
         print(f"LỖI CREATE INVITE: {type(e).__name__}: {e}", flush=True)
         await message.channel.send(
             "Chị không tạo được lời mời 😭 (bot thiếu quyền **Create Instant Invite** "
@@ -132,12 +151,17 @@ async def handle_invite(message, bot):
         )
 
 
+# Xử lý lệnh vote/poll (vd: `chị cá vote Đi ăn gì? | Phở | Bún`).
+# Tách câu hỏi + các lựa chọn bằng "|" hoặc ";", gắn emoji số để bỏ phiếu.
 async def handle_poll(message, bot) -> bool:
     raw = message.content
+    # Bỏ tiền tố "chị cá/chica" và từ khóa "poll/vote/bầu/bỏ phiếu"
     raw = re.sub(r"(?i)^(chị\s*cá|chica)\s*", "", raw).strip()
     raw = re.sub(r"(?i)^(poll|vote|bầu|bỏ\s*phiếu)\s*", "", raw).strip()
+    # Tách thành: câu hỏi + các lựa chọn
     segments = [s.strip() for s in re.split(r"\||;", raw) if s.strip()]
 
+    # Cần tối thiểu: câu hỏi + 2 lựa chọn (tức >= 3 phần)
     if len(segments) < 3:
         await message.channel.send(
             "Em viết chưa đúng format rồi. "
@@ -148,7 +172,7 @@ async def handle_poll(message, bot) -> bool:
 
     question = segments[0]
     options = segments[1:]
-    if len(options) > 10:
+    if len(options) > 10:   # Discord chỉ cho tối đa 10 emoji số
         options = options[:10]
 
     sender = message.author.display_name or message.author.name
@@ -163,6 +187,7 @@ async def handle_poll(message, bot) -> bool:
         e.set_author(name="Chị Cá 🐟", icon_url=bot.user.display_avatar.url)
     e.set_footer(text=f"Bỏ phiếu bằng cách react số tương ứng! • {sender} tạo")
     poll_msg = await message.channel.send(embed=e)
+    # Tự động gắn emoji số cho từng lựa chọn để người dùng bấm vote
     for i in range(len(options)):
         await poll_msg.add_reaction(NUMBER_EMOJIS[i])
     return True
