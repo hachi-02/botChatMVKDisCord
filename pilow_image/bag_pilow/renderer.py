@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import io
-import os
 from pathlib import Path
 
 import aiohttp
@@ -12,91 +11,63 @@ from PIL import Image, ImageDraw, ImageFont, ImageFilter
 # CONFIG
 # ============================================================
 
-WIDTH = 1100
-HEIGHT = 620
+WIDTH = 1200
+HEIGHT = 700
 
 BASE_DIR = Path(__file__).resolve().parent
-
-# Có thể bỏ background.png vào cùng folder này.
-BACKGROUND_PATH = BASE_DIR / "background.png"
-
-# Font:
-# Ưu tiên font custom đặt trong folder bag_pilow/fonts/
 FONT_DIR = BASE_DIR / "fonts"
-
-FONT_CANDIDATES = [
-    FONT_DIR / "NotoSans-Regular.ttf",
-    FONT_DIR / "NotoSans-Bold.ttf",
-    FONT_DIR / "BeVietnamPro-Regular.ttf",
-    FONT_DIR / "BeVietnamPro-Bold.ttf",
-    FONT_DIR / "Inter-Regular.ttf",
-    FONT_DIR / "Inter-Bold.ttf",
-]
-
-# Font hệ thống dự phòng
-SYSTEM_FONTS = [
-    "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-    "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-]
+BACKGROUND_PATH = BASE_DIR / "background.png"
 
 
 # ============================================================
 # FONT
 # ============================================================
 
-def _find_font(bold: bool = False):
-    names = [
-        "NotoSans-Bold.ttf" if bold else "NotoSans-Regular.ttf",
-        "BeVietnamPro-Bold.ttf" if bold else "BeVietnamPro-Regular.ttf",
-        "Inter-Bold.ttf" if bold else "Inter-Regular.ttf",
-    ]
+def get_font(size: int, bold: bool = False):
+    """
+    Font ưu tiên:
+    pilow_image/bag_pilow/fonts/
+    """
+
+    if bold:
+        names = [
+            "NotoSans-Bold.ttf",
+            "BeVietnamPro-Bold.ttf",
+            "Inter-Bold.ttf",
+            "DejaVuSans-Bold.ttf",
+        ]
+    else:
+        names = [
+            "NotoSans-Regular.ttf",
+            "BeVietnamPro-Regular.ttf",
+            "Inter-Regular.ttf",
+            "DejaVuSans.ttf",
+        ]
 
     for name in names:
         path = FONT_DIR / name
+
         if path.exists():
-            return path
+            return ImageFont.truetype(str(path), size)
 
-    # Thử font system
-    if bold:
-        system = [
-            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-            "/usr/share/fonts/truetype/liberation2/LiberationSans-Bold.ttf",
-        ]
-    else:
-        system = [
-            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-            "/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf",
-        ]
+    system_fonts = [
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+        if bold
+        else "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+    ]
 
-    for path in system:
-        if os.path.exists(path):
-            return path
-
-    return None
-
-
-def _font(size: int, bold: bool = False):
-    path = _find_font(bold)
-
-    if path:
-        return ImageFont.truetype(str(path), size)
+    for path in system_fonts:
+        if Path(path).exists():
+            return ImageFont.truetype(path, size)
 
     return ImageFont.load_default()
 
 
 # ============================================================
-# DRAW HELPERS
+# HELPERS
 # ============================================================
 
-def _rounded_rectangle(
-    img: Image.Image,
-    box,
-    radius,
-    fill,
-    outline=None,
-    width=1,
-):
-    draw = ImageDraw.Draw(img)
+def rounded(draw, box, radius, fill, outline=None, width=1):
     draw.rounded_rectangle(
         box,
         radius=radius,
@@ -106,83 +77,138 @@ def _rounded_rectangle(
     )
 
 
-def _center_text(draw, box, text, font, fill):
+def center_text(draw, box, text, font, fill):
     x1, y1, x2, y2 = box
 
     bbox = draw.textbbox((0, 0), text, font=font)
-    tw = bbox[2] - bbox[0]
-    th = bbox[3] - bbox[1]
 
-    x = x1 + ((x2 - x1) - tw) / 2
-    y = y1 + ((y2 - y1) - th) / 2 - bbox[1]
+    w = bbox[2] - bbox[0]
+    h = bbox[3] - bbox[1]
 
-    draw.text((x, y), text, font=font, fill=fill)
+    x = x1 + (x2 - x1 - w) / 2
+    y = y1 + (y2 - y1 - h) / 2 - bbox[1]
 
-
-def _fit_text(draw, text, max_width, font_size, bold=False):
-    size = font_size
-
-    while size >= 12:
-        font = _font(size, bold)
-        bbox = draw.textbbox((0, 0), text, font=font)
-
-        if bbox[2] - bbox[0] <= max_width:
-            return font
-
-        size -= 1
-
-    return _font(12, bold)
+    draw.text(
+        (x, y),
+        text,
+        font=font,
+        fill=fill,
+    )
 
 
-def _hex_to_rgb(hex_color):
-    hex_color = hex_color.replace("#", "")
-    return tuple(int(hex_color[i:i + 2], 16) for i in (0, 2, 4))
+def add_shadow(
+    img,
+    box,
+    radius=25,
+    shadow=(0, 0, 0, 120),
+    blur=12,
+    offset=(0, 8),
+):
+    layer = Image.new(
+        "RGBA",
+        img.size,
+        (0, 0, 0, 0),
+    )
+
+    draw = ImageDraw.Draw(layer)
+
+    x1, y1, x2, y2 = box
+
+    draw.rounded_rectangle(
+        (
+            x1 + offset[0],
+            y1 + offset[1],
+            x2 + offset[0],
+            y2 + offset[1],
+        ),
+        radius=radius,
+        fill=shadow,
+    )
+
+    layer = layer.filter(
+        ImageFilter.GaussianBlur(blur)
+    )
+
+    img.alpha_composite(layer)
 
 
 # ============================================================
 # BACKGROUND
 # ============================================================
 
-def _create_background():
-    img = Image.new("RGBA", (WIDTH, HEIGHT), (18, 21, 30, 255))
-
-    # Nếu có background.png thì dùng background đó
+def create_background():
     if BACKGROUND_PATH.exists():
         try:
-            bg = Image.open(BACKGROUND_PATH).convert("RGBA")
-            bg = bg.resize((WIDTH, HEIGHT), Image.Resampling.LANCZOS)
+            bg = Image.open(
+                BACKGROUND_PATH
+            ).convert("RGBA")
 
-            # Làm tối background để chữ nổi hơn
-            overlay = Image.new("RGBA", (WIDTH, HEIGHT), (5, 8, 15, 115))
+            bg = bg.resize(
+                (WIDTH, HEIGHT),
+                Image.Resampling.LANCZOS,
+            )
+
+            # Tối background
+            overlay = Image.new(
+                "RGBA",
+                (WIDTH, HEIGHT),
+                (5, 7, 12, 105),
+            )
+
             bg.alpha_composite(overlay)
 
             return bg
+
         except Exception:
             pass
 
-    # Background gradient giả lập
+    # Gradient background
+    img = Image.new(
+        "RGBA",
+        (WIDTH, HEIGHT),
+        (12, 15, 23, 255),
+    )
+
     pixels = img.load()
 
     for y in range(HEIGHT):
         ratio = y / HEIGHT
 
-        r = int(17 + ratio * 5)
-        g = int(21 + ratio * 8)
-        b = int(31 + ratio * 15)
+        r = int(12 + ratio * 8)
+        g = int(15 + ratio * 10)
+        b = int(23 + ratio * 14)
 
         for x in range(WIDTH):
-            pixels[x, y] = (r, g, b, 255)
+            pixels[x, y] = (
+                r,
+                g,
+                b,
+                255,
+            )
 
-    # Ánh sáng góc phải
-    glow = Image.new("RGBA", (WIDTH, HEIGHT), (0, 0, 0, 0))
+    # Ánh sáng nhẹ
+    glow = Image.new(
+        "RGBA",
+        (WIDTH, HEIGHT),
+        (0, 0, 0, 0),
+    )
+
     gd = ImageDraw.Draw(glow)
 
     gd.ellipse(
-        (650, -170, 1250, 430),
-        fill=(80, 210, 190, 45),
+        (-150, -150, 550, 500),
+        fill=(70, 200, 180, 35),
     )
 
-    glow = glow.filter(ImageFilter.GaussianBlur(90))
+    gd.ellipse(
+        (800, 300, 1400, 900),
+        fill=(70, 120, 220, 25),
+    )
+
+    glow = glow.filter(
+        ImageFilter.GaussianBlur(100)
+    )
+
     img.alpha_composite(glow)
 
     return img
@@ -192,23 +218,27 @@ def _create_background():
 # AVATAR
 # ============================================================
 
-async def _download_avatar(url: str | None):
+async def download_avatar(url):
     if not url:
         return None
 
     try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(
-                url,
-                timeout=aiohttp.ClientTimeout(total=10),
-            ) as response:
+        timeout = aiohttp.ClientTimeout(total=10)
+
+        async with aiohttp.ClientSession(
+            timeout=timeout
+        ) as session:
+
+            async with session.get(url) as response:
 
                 if response.status != 200:
                     return None
 
                 data = await response.read()
 
-        avatar = Image.open(io.BytesIO(data)).convert("RGBA")
+        avatar = Image.open(
+            io.BytesIO(data)
+        ).convert("RGBA")
 
         return avatar
 
@@ -216,8 +246,25 @@ async def _download_avatar(url: str | None):
         return None
 
 
-def _draw_avatar(img, avatar, center, size):
+def draw_avatar(img, avatar, center, size):
     if avatar is None:
+        # Placeholder
+        draw = ImageDraw.Draw(img)
+
+        x, y = center
+
+        draw.ellipse(
+            (
+                x - size // 2,
+                y - size // 2,
+                x + size // 2,
+                y + size // 2,
+            ),
+            fill=(38, 45, 57, 255),
+            outline=(120, 220, 205, 255),
+            width=5,
+        )
+
         return
 
     avatar = avatar.resize(
@@ -225,7 +272,12 @@ def _draw_avatar(img, avatar, center, size):
         Image.Resampling.LANCZOS,
     )
 
-    mask = Image.new("L", (size, size), 0)
+    mask = Image.new(
+        "L",
+        (size, size),
+        0,
+    )
+
     md = ImageDraw.Draw(mask)
 
     md.ellipse(
@@ -237,19 +289,41 @@ def _draw_avatar(img, avatar, center, size):
     y = center[1] - size // 2
 
     # Glow
-    glow = Image.new("RGBA", (size + 24, size + 24), (0, 0, 0, 0))
+    glow = Image.new(
+        "RGBA",
+        (size + 70, size + 70),
+        (0, 0, 0, 0),
+    )
+
     gd = ImageDraw.Draw(glow)
 
     gd.ellipse(
-        (8, 8, size + 16, size + 16),
-        fill=(60, 220, 195, 90),
+        (10, 10, size + 60, size + 60),
+        fill=(80, 220, 200, 80),
     )
 
-    glow = glow.filter(ImageFilter.GaussianBlur(12))
+    glow = glow.filter(
+        ImageFilter.GaussianBlur(20)
+    )
 
     img.alpha_composite(
         glow,
-        (x - 12, y - 12),
+        (x - 35, y - 35),
+    )
+
+    # Outer ring
+    draw = ImageDraw.Draw(img)
+
+    draw.ellipse(
+        (
+            x - 10,
+            y - 10,
+            x + size + 10,
+            y + size + 10,
+        ),
+        fill=(17, 21, 30, 255),
+        outline=(91, 212, 195, 255),
+        width=5,
     )
 
     img.paste(
@@ -258,68 +332,103 @@ def _draw_avatar(img, avatar, center, size):
         mask,
     )
 
-    draw = ImageDraw.Draw(img)
-
+    # Inner border
     draw.ellipse(
-        (x - 3, y - 3, x + size + 3, y + size + 3),
-        outline=(100, 230, 210, 220),
-        width=3,
+        (
+            x,
+            y,
+            x + size,
+            y + size,
+        ),
+        outline=(215, 255, 248, 190),
+        width=2,
     )
 
 
 # ============================================================
-# ICONS
+# GEM ICON
 # ============================================================
 
-def _draw_gem(draw, center, radius=18):
+def draw_gem(draw, center, size=30):
     x, y = center
 
     points = [
-        (x, y - radius),
-        (x + radius, y),
-        (x, y + radius),
-        (x - radius, y),
+        (x, y - size),
+        (x + size, y),
+        (x, y + size),
+        (x - size, y),
     ]
 
     draw.polygon(
         points,
-        fill=(110, 235, 220),
-        outline=(210, 255, 250),
+        fill=(93, 225, 211),
+        outline=(225, 255, 251),
     )
 
     draw.polygon(
         [
-            (x, y - radius + 5),
-            (x + radius - 5, y),
-            (x, y + 4),
+            (x, y - size + 5),
+            (x + size - 7, y),
+            (x, y + 5),
         ],
-        fill=(205, 255, 250),
+        fill=(190, 255, 247),
     )
 
-
-def _draw_coin(draw, center, radius=18):
-    x, y = center
-
-    draw.ellipse(
-        (x - radius, y - radius, x + radius, y + radius),
-        fill=(220, 174, 64),
-        outline=(255, 225, 130),
+    draw.line(
+        (
+            x,
+            y - size + 5,
+            x,
+            y + size - 5,
+        ),
+        fill=(45, 160, 153),
         width=2,
     )
 
-    font = _font(19, True)
 
-    _center_text(
+# ============================================================
+# MORA ICON
+# ============================================================
+
+def draw_mora(draw, center, size=30):
+    x, y = center
+
+    draw.ellipse(
+        (
+            x - size,
+            y - size,
+            x + size,
+            y + size,
+        ),
+        fill=(221, 174, 64),
+        outline=(255, 230, 150),
+        width=3,
+    )
+
+    draw.ellipse(
+        (
+            x - size + 7,
+            y - size + 7,
+            x + size - 7,
+            y + size - 7,
+        ),
+        outline=(177, 124, 32),
+        width=2,
+    )
+
+    font = get_font(25, True)
+
+    center_text(
         draw,
         (
-            x - radius,
-            y - radius,
-            x + radius,
-            y + radius,
+            x - size,
+            y - size,
+            x + size,
+            y + size,
         ),
         "M",
         font,
-        (90, 55, 10),
+        (105, 67, 18),
     )
 
 
@@ -327,155 +436,242 @@ def _draw_coin(draw, center, radius=18):
 # RESOURCE CARD
 # ============================================================
 
-def _draw_resource_card(
+def draw_resource_card(
     img,
     box,
     title,
     value,
-    icon_type,
+    icon,
 ):
     draw = ImageDraw.Draw(img)
 
     x1, y1, x2, y2 = box
 
-    # Shadow
-    shadow = Image.new("RGBA", img.size, (0, 0, 0, 0))
-    sd = ImageDraw.Draw(shadow)
-
-    sd.rounded_rectangle(
-        (x1 + 4, y1 + 7, x2 + 4, y2 + 7),
-        radius=22,
-        fill=(0, 0, 0, 100),
-    )
-
-    shadow = shadow.filter(ImageFilter.GaussianBlur(8))
-    img.alpha_composite(shadow)
-
-    # Card
-    _rounded_rectangle(
+    add_shadow(
         img,
         box,
-        22,
-        fill=(29, 35, 47, 235),
-        outline=(75, 93, 108, 170),
+        radius=28,
+        blur=14,
+    )
+
+    # Card
+    rounded(
+        draw,
+        box,
+        28,
+        fill=(25, 31, 43, 245),
+        outline=(78, 96, 111, 230),
+        width=2,
+    )
+
+    # Top highlight
+    draw.line(
+        (
+            x1 + 30,
+            y1 + 2,
+            x2 - 30,
+            y1 + 2,
+        ),
+        fill=(100, 220, 204, 150),
         width=2,
     )
 
     # Icon circle
-    icon_x = x1 + 45
-    icon_y = (y1 + y2) // 2
+    icon_center = (
+        x1 + 85,
+        (y1 + y2) // 2,
+    )
 
     draw.ellipse(
         (
-            icon_x - 27,
-            icon_y - 27,
-            icon_x + 27,
-            icon_y + 27,
+            icon_center[0] - 50,
+            icon_center[1] - 50,
+            icon_center[0] + 50,
+            icon_center[1] + 50,
         ),
-        fill=(40, 49, 61, 255),
-        outline=(90, 110, 120, 130),
+        fill=(38, 46, 60, 255),
+        outline=(79, 101, 115, 180),
         width=2,
     )
 
-    if icon_type == "gem":
-        _draw_gem(draw, (icon_x, icon_y), 16)
+    if icon == "gem":
+        draw_gem(
+            draw,
+            icon_center,
+            28,
+        )
     else:
-        _draw_coin(draw, (icon_x, icon_y), 16)
+        draw_mora(
+            draw,
+            icon_center,
+            28,
+        )
 
-    # Text
-    title_font = _font(18, False)
-    value_font = _font(27, True)
-
+    # Title
     draw.text(
-        (x1 + 82, y1 + 18),
+        (
+            x1 + 155,
+            y1 + 28,
+        ),
         title,
-        font=title_font,
-        fill=(166, 178, 193),
+        font=get_font(21, True),
+        fill=(155, 170, 184),
     )
+
+    # Value
+    value_text = f"{value:,}"
 
     draw.text(
-        (x1 + 82, y1 + 45),
-        f"{value:,}",
-        font=value_font,
-        fill=(245, 248, 250),
+        (
+            x1 + 155,
+            y1 + 65,
+        ),
+        value_text,
+        font=get_font(42, True),
+        fill=(248, 250, 252),
     )
 
 
 # ============================================================
-# XP BAR
+# LEVEL
 # ============================================================
 
-def _draw_xp_bar(
+def draw_level(
     img,
     x,
     y,
-    width,
-    progress,
-    total,
+    level,
+    current_xp,
+    max_xp,
 ):
     draw = ImageDraw.Draw(img)
 
-    ratio = 0 if total <= 0 else max(0, min(progress / total, 1))
-
-    # Label
-    label_font = _font(18, True)
-
+    # LEVEL label
     draw.text(
-        (x, y - 35),
-        "TIẾN ĐỘ CẤP",
-        font=label_font,
-        fill=(205, 214, 220),
+        (x, y),
+        "LEVEL",
+        font=get_font(18, True),
+        fill=(132, 149, 164),
     )
 
-    # Background
-    bar_y = y
-
-    draw.rounded_rectangle(
-        (x, bar_y, x + width, bar_y + 22),
-        radius=11,
-        fill=(11, 15, 22, 230),
-        outline=(66, 80, 92, 200),
-        width=2,
+    # Level number
+    draw.text(
+        (
+            x,
+            y + 23,
+        ),
+        str(level),
+        font=get_font(54, True),
+        fill=(245, 248, 250),
     )
-
-    fill_width = int(width * ratio)
-
-    if fill_width > 4:
-        draw.rounded_rectangle(
-            (
-                x + 3,
-                bar_y + 3,
-                x + fill_width,
-                bar_y + 19,
-            ),
-            radius=8,
-            fill=(67, 205, 184, 255),
-        )
 
     # XP text
-    xp_font = _font(16, False)
-
-    xp_text = f"{progress:,} / {total:,} XP"
-
-    bbox = draw.textbbox(
-        (0, 0),
-        xp_text,
-        font=xp_font,
+    xp_text = (
+        f"{current_xp:,} / "
+        f"{max_xp:,} XP"
     )
 
     draw.text(
         (
-            x + width - (bbox[2] - bbox[0]),
-            bar_y + 31,
+            x + 105,
+            y + 53,
         ),
         xp_text,
-        font=xp_font,
-        fill=(145, 158, 171),
+        font=get_font(18, False),
+        fill=(135, 151, 165),
+    )
+
+    # XP bar
+    bar_x = x + 105
+    bar_y = y + 28
+    bar_w = 400
+    bar_h = 22
+
+    rounded(
+        draw,
+        (
+            bar_x,
+            bar_y,
+            bar_x + bar_w,
+            bar_y + bar_h,
+        ),
+        11,
+        fill=(10, 14, 21, 240),
+        outline=(62, 76, 89, 220),
+        width=2,
+    )
+
+    ratio = 0
+
+    if max_xp > 0:
+        ratio = max(
+            0,
+            min(
+                current_xp / max_xp,
+                1,
+            ),
+        )
+
+    fill_w = int(
+        (bar_w - 6) * ratio
+    )
+
+    if fill_w > 4:
+        rounded(
+            draw,
+            (
+                bar_x + 3,
+                bar_y + 3,
+                bar_x + 3 + fill_w,
+                bar_y + bar_h - 3,
+            ),
+            8,
+            fill=(71, 205, 184, 255),
+        )
+
+
+# ============================================================
+# RANK
+# ============================================================
+
+def draw_rank(
+    draw,
+    x,
+    y,
+    rank,
+):
+    rank_colors = {
+        1: (255, 215, 70),
+        2: (215, 220, 230),
+        3: (205, 145, 82),
+    }
+
+    color = rank_colors.get(
+        rank,
+        (105, 218, 199),
+    )
+
+    # Star
+    draw.text(
+        (x, y),
+        "★",
+        font=get_font(30, True),
+        fill=color,
+    )
+
+    draw.text(
+        (
+            x + 38,
+            y + 3,
+        ),
+        f"RANK {rank}",
+        font=get_font(21, True),
+        fill=color,
     )
 
 
 # ============================================================
-# MAIN RENDER
+# MAIN
 # ============================================================
 
 async def create_bag(
@@ -488,211 +684,185 @@ async def create_bag(
     points_per_level: int = 100,
 ):
     """
-    Render giao diện Bag bằng Pillow.
-
-    target:
-        Discord Member/User object.
-
-    gems:
-        Số Nguyên Thạch.
-
-    mora:
-        Số Mora.
-
-    rank:
-        Rank hiện tại.
-
-    level:
-        Level hiện tại.
-
-    xp:
-        XP hiện tại.
-
-    points_per_level:
-        XP cần để lên cấp.
+    Tạo giao diện Bag bằng Pillow.
     """
 
-    img = _create_background()
+    img = create_background()
     draw = ImageDraw.Draw(img)
 
     # ========================================================
-    # HEADER
+    # TITLE
     # ========================================================
 
-    # Logo / avatar bot
     draw.text(
-        (50, 38),
-        "BAG",
-        font=_font(38, True),
-        fill=(245, 248, 250),
-    )
-
-    draw.text(
-        (50, 82),
-        "TÀI SẢN NHÂN VẬT",
-        font=_font(15, False),
-        fill=(115, 202, 190),
-    )
-
-    # đường line
-    draw.line(
-        (50, 120, WIDTH - 50, 120),
-        fill=(65, 82, 95, 180),
-        width=1,
-    )
-
-    # ========================================================
-    # PROFILE CARD
-    # ========================================================
-
-    profile_box = (50, 150, 1050, 310)
-
-    _rounded_rectangle(
-        img,
-        profile_box,
-        28,
-        fill=(24, 30, 42, 235),
-        outline=(72, 91, 105, 180),
-        width=2,
-    )
-
-    # Avatar
-    avatar_url = None
-
-    try:
-        avatar_url = target.display_avatar.url
-    except Exception:
-        pass
-
-    avatar = await _download_avatar(
-        str(avatar_url) if avatar_url else None
-    )
-
-    _draw_avatar(
-        img,
-        avatar,
-        (140, 230),
-        110,
-    )
-
-    # Username
-    username = getattr(
-        target,
-        "display_name",
-        "Unknown",
-    )
-
-    username = str(username)
-
-    username_font = _fit_text(
-        draw,
-        username,
-        480,
-        32,
-        True,
-    )
-
-    draw.text(
-        (225, 178),
-        username,
-        font=username_font,
+        (55, 35),
+        "TÚI ĐỒ",
+        font=get_font(43, True),
         fill=(248, 250, 252),
     )
 
-    # Rank
-    rank_colors = {
-        1: (255, 215, 0),
-        2: (205, 215, 225),
-        3: (205, 145, 80),
-    }
-
-    rank_color = rank_colors.get(
-        rank,
-        (90, 210, 195),
-    )
-
-    rank_text = f"RANK #{rank}"
-
     draw.text(
-        (227, 224),
-        rank_text,
-        font=_font(19, True),
-        fill=rank_color,
+        (57, 87),
+        "INVENTORY",
+        font=get_font(17, True),
+        fill=(91, 205, 190),
     )
 
-    # Level badge
-    badge = (820, 180, 1005, 260)
-
-    _rounded_rectangle(
-        img,
-        badge,
-        20,
-        fill=(35, 43, 56, 255),
-        outline=(91, 113, 125, 190),
+    draw.line(
+        (
+            55,
+            125,
+            WIDTH - 55,
+            125,
+        ),
+        fill=(72, 88, 101, 190),
         width=2,
     )
 
-    draw.text(
-        (845, 192),
-        "LEVEL",
-        font=_font(15, True),
-        fill=(135, 153, 165),
+    # ========================================================
+    # MAIN PROFILE
+    # ========================================================
+
+    profile_box = (
+        55,
+        155,
+        1145,
+        385,
     )
 
+    add_shadow(
+        img,
+        profile_box,
+        radius=32,
+        blur=16,
+    )
+
+    rounded(
+        draw,
+        profile_box,
+        32,
+        fill=(21, 27, 39, 245),
+        outline=(79, 98, 113, 230),
+        width=2,
+    )
+
+    # ========================================================
+    # AVATAR
+    # ========================================================
+
+    avatar_url = None
+
+    try:
+        avatar_url = str(
+            target.display_avatar.url
+        )
+    except Exception:
+        pass
+
+    avatar = await download_avatar(
+        avatar_url
+    )
+
+    draw_avatar(
+        img,
+        avatar,
+        center=(170, 270),
+        size=190,
+    )
+
+    # ========================================================
+    # NAME
+    # ========================================================
+
+    name = str(
+        getattr(
+            target,
+            "display_name",
+            "Unknown",
+        )
+    )
+
+    # Giới hạn tên dài
+    if len(name) > 20:
+        name = name[:19] + "…"
+
     draw.text(
-        (845, 213),
-        str(level),
-        font=_font(34, True),
-        fill=(245, 248, 250),
+        (300, 190),
+        name,
+        font=get_font(39, True),
+        fill=(250, 252, 253),
+    )
+
+    # Rank
+    draw_rank(
+        draw,
+        305,
+        245,
+        rank,
+    )
+
+    # Level
+    current_xp = xp % points_per_level
+
+    draw_level(
+        img,
+        300,
+        295,
+        level,
+        current_xp,
+        points_per_level,
     )
 
     # ========================================================
     # RESOURCE CARDS
     # ========================================================
 
-    _draw_resource_card(
+    draw_resource_card(
         img,
-        (50, 340, 525, 445),
+        (
+            55,
+            420,
+            575,
+            570,
+        ),
         "NGUYÊN THẠCH",
         gems,
         "gem",
     )
 
-    _draw_resource_card(
+    draw_resource_card(
         img,
-        (575, 340, 1050, 445),
+        (
+            625,
+            420,
+            1145,
+            570,
+        ),
         "MORA",
         mora,
-        "coin",
-    )
-
-    # ========================================================
-    # XP
-    # ========================================================
-
-    current_xp = xp % points_per_level
-
-    _draw_xp_bar(
-        img,
-        50,
-        500,
-        1000,
-        current_xp,
-        points_per_level,
+        "mora",
     )
 
     # ========================================================
     # FOOTER
     # ========================================================
 
-    footer = "Mỗi tin nhắn  +5 💠   +500 Mora   +10 XP"
+    footer = (
+        "Mỗi tin nhắn   +5 💠   •   "
+        "+500 🪙   •   +10 XP"
+    )
 
-    _center_text(
+    center_text(
         draw,
-        (50, 565, 1050, 600),
+        (
+            55,
+            610,
+            1145,
+            650,
+        ),
         footer,
-        _font(15, False),
-        (110, 125, 140),
+        get_font(17, False),
+        (110, 126, 141),
     )
 
     # ========================================================
