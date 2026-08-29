@@ -30,6 +30,7 @@ from config import (
     EVENT_DEFAULT_DURATION_MINUTES,
     DATABASE_URL,
     ASSET_KEYWORDS,
+    DAILY_KEYWORDS,
     POINT_COOLDOWN,
     POINTS_PER_MSG,
     POINTS_PER_LEVEL,
@@ -46,7 +47,7 @@ from memory import add_message, get_history, remember_user, get_known_users
 from search import search_web
 from web_server import start_web_server
 from db import init_db, get_gems
-from points import maybe_award_points, handle_assets, EMBED_COLOR, LEVELUP_GIF
+from points import maybe_award_points, handle_assets, handle_daily, EMBED_COLOR, LEVELUP_GIF
 from gacha.gacha import handle_gacha, handle_collection, GachaView
 
 intents = discord.Intents.default()
@@ -102,6 +103,7 @@ MENU_PAGES = [
         [
             ("📊 Vote", "`chị cá` + `vote Câu hỏi? | chọn 1 | chọn 2`"),
             ("⏰ Nhắc", "`chị cá` + `nhắc em 7h học bài`"),
+            ("📅 Điểm danh", "`chị cá` + `daily` (mỗi ngày +10❖ +500🪙)"),
             ("📅 Sự kiện", "`chị cá tạo sự kiện` + `Tên | thời gian | mô tả | địa điểm`"),
             ("🔗 Lời mời", "`chị cá` + `tạo link mời`"),
         ],
@@ -813,6 +815,11 @@ async def on_message(message):
             await handle_pvp_rank(message, bot)
         else:
             await start_pvp_challenge(message, bot)
+        return
+
+    is_daily = addressed and any(kw in content_lower for kw in DAILY_KEYWORDS)
+    if is_daily:
+        await handle_daily(message, bot)
         return
 
     is_asset = addressed and any(kw in content_lower for kw in ASSET_KEYWORDS)

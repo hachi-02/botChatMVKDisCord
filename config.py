@@ -82,6 +82,9 @@ EMOJI_MAP = {
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 ASSET_KEYWORDS = ["tài sản", "tai san", "assets", "nguyên thạch", "mora"]
+DAILY_KEYWORDS = ["daily"]
+DAILY_GEMS = 10
+DAILY_MORA = 500
 POINT_COOLDOWN = 30
 POINTS_PER_MSG = 10
 GEM_PER_MSG = 5

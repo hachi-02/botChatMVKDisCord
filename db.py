@@ -12,7 +12,8 @@ SCHEMA_SQL = (
     " points  INTEGER NOT NULL DEFAULT 0,"
     " mora    INTEGER NOT NULL DEFAULT 0,"
     " msgs    INTEGER NOT NULL DEFAULT 0,"
-    " last    TIMESTAMP);"
+    " last    TIMESTAMP,"
+    " last_checkin DATE);"
 )
 
 GACHA_SCHEMA_SQL = (
@@ -67,6 +68,9 @@ async def _ensure_schema():
             "ALTER TABLE points ADD COLUMN IF NOT EXISTS total_xp INTEGER NOT NULL DEFAULT 0"
         )
         await conn.execute(
+            "ALTER TABLE points ADD COLUMN IF NOT EXISTS last_checkin DATE"
+        )
+        await conn.execute(
             "UPDATE points SET total_xp = GREATEST(total_xp, points)"
         )
     _schema_ready = True
@@ -95,6 +99,9 @@ async def init_db():
         )
         await conn.execute(
             "ALTER TABLE points ADD COLUMN IF NOT EXISTS total_xp INTEGER NOT NULL DEFAULT 0"
+        )
+        await conn.execute(
+            "ALTER TABLE points ADD COLUMN IF NOT EXISTS last_checkin DATE"
         )
     db_pool = pool
     _schema_ready = True
@@ -314,4 +321,23 @@ async def update_pvp_result(
         )
     except Exception as e:
         print(f"LỖI UPDATE_PVP_RESULT: {type(e).__name__}: {e}", flush=True)
+
+
+async def claim_daily(user_id: int, gems: int, mora: int) -> bool:
+    """Nhận điểm danh hôm nay. Trả về True nếu đã nhận thành công (chưa nhận hôm nay),
+    False nếu hôm nay đã nhận rồi. Dùng khoá nếu DATABASE_URL nối được."""
+    if db_pool is None:
+        return False
+    try:
+        await _ensure_schema()
+        updated = await db_pool.execute(
+            "UPDATE points SET points = points + $2, mora = points.mora + $3, "
+            "last_checkin = CURRENT_DATE "
+            "WHERE user_id = $1 AND (last_checkin IS DISTINCT FROM CURRENT_DATE)",
+            user_id, gems, mora,
+        )
+        return updated == "UPDATE 1"
+    except Exception as e:
+        print(f"LỖI CLAIM_DAILY: {type(e).__name__}: {e}", flush=True)
+        return False
 

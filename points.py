@@ -3,8 +3,8 @@ import discord
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from config import POINT_COOLDOWN, POINTS_PER_MSG, GEM_PER_MSG, MORA_PER_MSG, POINTS_PER_LEVEL
-from db import add_rewards, get_gems, get_mora, get_rank, get_xp
+from config import POINT_COOLDOWN, POINTS_PER_MSG, GEM_PER_MSG, MORA_PER_MSG, POINTS_PER_LEVEL, DAILY_GEMS, DAILY_MORA
+from db import add_rewards, get_gems, get_mora, get_rank, get_xp, claim_daily
 
 cooldown = {}
 EMBED_COLOR = 0x1ABC9C
@@ -84,3 +84,32 @@ async def handle_assets(message, bot):
     icon = message.guild.icon.url if (message.guild and message.guild.icon) else discord.Embed.Empty
     embed.set_footer(text="Mỗi tin +5❖ +500🪙 +10 XP / 30s", icon_url=icon)
     await message.channel.send(embed=embed, reference=message, mention_author=False)
+
+
+async def handle_daily(message, bot):
+    uid = message.author.id
+    ok = await claim_daily(uid, DAILY_GEMS, DAILY_MORA)
+    if not ok:
+        pts = await get_gems(uid)
+        mora = await get_mora(uid)
+        e = discord.Embed(
+            title="📅 Điểm danh",
+            description=f"{message.author.mention} hôm nay đã điểm danh rồi, mai quay lại nhé! 🐟",
+            color=EMBED_COLOR,
+        )
+        _author(e, bot)
+        e.add_field(name="Nguyên thạch", value=f"**{pts}❖**", inline=True)
+        e.add_field(name="Mora", value=f"**{mora}🪙**", inline=True)
+        await message.channel.send(embed=e, reference=message, mention_author=False)
+        return
+    pts = await get_gems(uid)
+    mora = await get_mora(uid)
+    e = discord.Embed(
+        title="📅 Điểm danh thành công!",
+        description=f"{message.author.mention} nhận được **+{DAILY_GEMS}❖** và **+{DAILY_MORA}🪙** 🎉\nQuay lại vào ngày mai để nhận tiếp nhé!",
+        color=EMBED_COLOR,
+    )
+    _author(e, bot)
+    e.add_field(name="Nguyên thạch", value=f"**{pts}❖**", inline=True)
+    e.add_field(name="Mora", value=f"**{mora}🪙**", inline=True)
+    await message.channel.send(embed=e, reference=message, mention_author=False)
