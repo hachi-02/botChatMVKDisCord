@@ -59,7 +59,17 @@ async def on_ready():
 
 @bot.event
 async def on_member_join(member):
-    channel = member.guild.system_channel
+    guild = member.guild
+    channel = None
+    # Ưu tiên kênh "chat-chit", rồi kênh hệ thống, rồi kênh text đầu tiên bot gửi được
+    channel = discord.utils.get(guild.text_channels, name="chat-chit")
+    if channel is None:
+        channel = guild.system_channel
+    if channel is None:
+        channel = discord.utils.find(
+            lambda c: c.permissions_for(guild.me).send_messages,
+            guild.text_channels,
+        )
     if channel:
         await channel.send(
             f"Chào em {member.mention} đến với server! 🐟 "
