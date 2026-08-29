@@ -8,7 +8,7 @@ import re
 
 import discord
 
-from points import EMBED_COLOR, LEVELUP_GIF
+from points import EMBED_COLOR
 
 # Bộ emoji số 1-10 dùng để gán cho các lựa chọn trong poll
 NUMBER_EMOJIS = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"]
@@ -48,56 +48,86 @@ MENU_PAGES = [
 ]
 
 
-# Tạo embed hiển thị menu ở trang `page` (chỉ dùng nội bộ).
-def _menu_embed(bot, page=0):
+# Tạo nội dung text của menu trang `page` (nằm trong TextDisplay của Container).
+def _menu_text(page=0):
     title, items = MENU_PAGES[page]
-    e = discord.Embed(title=f"Menu Chị Cá — {title}", color=EMBED_COLOR)
-    if bot.user:
-        e.set_author(name="Chị Cá", icon_url=bot.user.display_avatar.url)
-    e.set_thumbnail(url=LEVELUP_GIF)
+    lines = [f"# 🐟 Menu Chị Cá", "", f"## {title}", ""]
     for name, val in items:
-        e.add_field(name=name, value=val, inline=True)
-    e.set_footer(text=f"Trang {page + 1}/{len(MENU_PAGES)} • Gõ \"chị cá menu\" để xem lại nhé!")
-    return e
+        lines.append(f"**{name}** — {val}")
+    lines.append("")
+    lines.append(f"_Trang {page + 1}/{len(MENU_PAGES)} • Gõ \"chị cá menu\" để xem lại!_")
+    return "\n".join(lines)
 
 
-# Giao diện menu có nút bấm ◀️/▶️ để chuyển trang (lắng nghe sự kiện tương tác).
-class MenuView(discord.ui.View):
+# Giao diện menu Components V2: 2 nút ◀️/▶️ (và nhãn trang) nằm trong cùng 1 Container
+# với phần tiêu đề Menu Chị Cá (tương tự GachaView).
+class MenuView(discord.ui.LayoutView):
     def __init__(self, bot):
         super().__init__(timeout=None)
         self.bot = bot
-        self.page = 0   # Trang hiện tại
+        self.page = 0           # Trang hiện tại
+        self.message = None
 
-    # Cập nhật lại embed theo trang hiện tại khi bấm nút
-    async def _show(self, interaction):
-        self.page_indicator.label = f"{self.page + 1}/{len(MENU_PAGES)}"
-        await interaction.response.edit_message(
-            embed=_menu_embed(self.bot, self.page), view=self
+        # Nút lùi / nhãn chỉ trang / nút tới
+        self.btn_prev = discord.ui.Button(
+            label="◀️",
+            style=discord.ButtonStyle.secondary,
+        )
+        self.btn_prev.callback = self._prev
+        self.btn_indicator = discord.ui.Button(
+            label=f"1/{len(MENU_PAGES)}",
+            style=discord.ButtonStyle.secondary,
+            disabled=True,
+        )
+        self.btn_next = discord.ui.Button(
+            label="▶️",
+            style=discord.ButtonStyle.secondary,
+        )
+        self.btn_next.callback = self._next
+
+        # Hàng chứa 3 nút, đặt trong container
+        self.button_row = discord.ui.ActionRow()
+        self.button_row.add_item(self.btn_prev)
+        self.button_row.add_item(self.btn_indicator)
+        self.button_row.add_item(self.btn_next)
+
+        # Text hiển thị nội dung trang (nằm trong container)
+        self.menu_text = discord.ui.TextDisplay(
+            content=_menu_text(self.page)
         )
 
+        # Container = khung bao gồm text + hàng nút
+        self.container = discord.ui.Container(
+            self.menu_text,
+            self.button_row,
+            accent_color=EMBED_COLOR,
+        )
+        self.add_item(self.container)
+
+    # Cập nhật nội dung text + nhãn trang, rồi chỉnh lại view trong tin nhắn
+    async def _show(self, interaction):
+        self.menu_text.content = _menu_text(self.page)
+        self.btn_indicator.label = f"{self.page + 1}/{len(MENU_PAGES)}"
+        await interaction.response.edit_message(view=self)
+
     # Nút lùi về trang trước (vòng lại trang cuối nếu đứng ở trang đầu)
-    @discord.ui.button(label="◀️", style=discord.ButtonStyle.secondary)
-    async def prev(self, interaction, button):
+    async def _prev(self, interaction):
         self.page = (self.page - 1) % len(MENU_PAGES)
         await self._show(interaction)
 
-    # Nút chỉ thị số trang (dạng "1/3"), không làm gì khi bấm
-    @discord.ui.button(label="1/1", style=discord.ButtonStyle.secondary, disabled=True)
-    async def page_indicator(self, interaction, button):
-        pass
-
     # Nút qua trang kế tiếp (vòng lại trang đầu nếu ở trang cuối)
-    @discord.ui.button(label="▶️", style=discord.ButtonStyle.secondary)
-    async def next(self, interaction, button):
+    async def _next(self, interaction):
         self.page = (self.page + 1) % len(MENU_PAGES)
         await self._show(interaction)
 
 
-# Gửi menu (trang đầu + view có nút bấm) vào kênh.
+# Gửi menu (container có text + 2 nút điều hướng trong cùng khung) vào kênh.
 async def handle_menu(message, bot):
-    await message.channel.send(
-        embed=_menu_embed(bot, 0), view=MenuView(bot), reference=message, mention_author=False
+    view = MenuView(bot)
+    g_msg = await message.channel.send(
+        view=view, reference=message, mention_author=False
     )
+    view.message = g_msg
 
 
 # Tạo embed danh sách thành viên đang online (hiện tối đa 20 người + vai trò).
