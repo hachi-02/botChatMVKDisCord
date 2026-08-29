@@ -792,7 +792,7 @@ async def on_message(message):
             pts = await get_gems(message.author.id)
             e = discord.Embed(
                 title="🎰 Gacha Thẻ Genshin",
-                description=f"💠 Nguyên thạch hiện có: **{pts}❖**\nChọn số lượt quay:",
+                description=f"Nguyên thạch hiện có: **{pts}💠**\nChọn số lượt quay:",
                 color=EMBED_COLOR,
             )
             e.set_footer(text="1 lần = 50❖ • 5 lần = 250❖")

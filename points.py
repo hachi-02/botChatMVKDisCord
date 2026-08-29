@@ -37,7 +37,7 @@ async def _award_and_notify(uid, author, channel, bot):
         prog = xp % POINTS_PER_LEVEL
         e = discord.Embed(
             title=f"🎉 {author.display_name} lên cấp {new_lvl}!",
-            description=f"{author.mention} vừa đạt **{new}❖** 🐟",
+            description=f"{author.mention} vừa đạt **{new}💠** 🐟",
             color=0xFFD700,
         )
         _author(e, bot)
@@ -70,10 +70,10 @@ async def handle_assets(message, bot):
     xp = await get_xp(target.id)
     lvl = xp // POINTS_PER_LEVEL + 1
     prog = xp % POINTS_PER_LEVEL
-    embed = discord.Embed(title=f"💠 {target.display_name}", color=_rank_color(rank))
+    embed = discord.Embed(title=f"{target.display_name}", color=_rank_color(rank))
     _author(embed, bot)
     embed.set_thumbnail(url=target.display_avatar.url)
-    embed.add_field(name="Nguyên thạch", value=f"**{pts}❖**", inline=True)
+    embed.add_field(name="Nguyên thạch", value=f"**{pts}💠**", inline=True)
     embed.add_field(name="Mora", value=f"**{mora}🪙**", inline=True)
     embed.add_field(name="Cấp", value=f"**{lvl}**", inline=True)
     embed.add_field(
