@@ -317,7 +317,7 @@ async def handle_collection(channel, author, bot):
     e.description = desc
 
     e.set_footer(
-        text=f"Đã có {len(owned)}/22 • {total} thẻ"
+        text=f"Đã có {len(owned)}/{len(CHARACTER_POOL)} • {total} thẻ"
     )
 
     await channel.send(embed=e)

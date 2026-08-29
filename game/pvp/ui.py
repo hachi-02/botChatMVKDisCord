@@ -800,6 +800,8 @@ def _effect_desc(eff: dict) -> str:
         return f"Sát thương đơn mục tiêu (~x{p:.2f} ATK) + hút {int(p2*100)}% sát thương thành máu"
     if t == "HEAL_ENERGY":
         return f"Hồi {p} HP đồng đội thấp máu + toàn đội nạp +{p2} nộ khí"
+    if t == "ENERGY_DEBUFF":
+        return f"Toàn đội nạp +{p2} nộ khí + mọi địch nhận thêm +{int(p*100)}% sát thương"
     if t == "STUN_ST_DMG":
         return f"Choáng mục tiêu 1 lượt + gây sát thương đơn (~x{p:.2f} ATK)"
     return eff.get("name", "Kỹ năng")

@@ -207,6 +207,12 @@ def _apply_effect(caster: Fighter, team: list, enemy: list, eff: dict, log: list
         for ally in team:
             ally.gain_energy(p2)
         log.append(f"{tag}: {heal_txt} + toàn đội +{p2} nộ khí ⚡")
+    elif t == "ENERGY_DEBUFF":
+        for ally in team:
+            ally.gain_energy(p2)
+        for e in enemy:
+            e.def_debuff += p
+        log.append(f"{tag}: toàn đội +{p2} nộ khí ⚡, toàn địch nhận thêm +{int(p*100)}% sát thương 🔻")
     elif t == "STUN_ST_DMG":
         if target and target.alive:
             dmg, crit, dodged = _compute_damage(caster, target, p)

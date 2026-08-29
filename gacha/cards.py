@@ -4,6 +4,7 @@ CHARACTER_POOL = [
     {"key": "nerfer", "name": "Nerfer", "url": "https://res.cloudinary.com/z2ffqaaf/image/upload/v1787824848/Nefer_Dynamic_Skin_xgth4j.webp", "rarity": "5L"},
     {"key": "mavuika", "name": "Mavuika", "url": "https://res.cloudinary.com/z2ffqaaf/image/upload/v1787824744/Mavuika_Dynamic_Skin_wnti94.gif", "rarity": "5L"},
     {"key": "furina", "name": "Furina", "url": "https://res.cloudinary.com/z2ffqaaf/image/upload/v1787824555/Furina_Dynamic_Skin_mrruy5.webp", "rarity": "5L"},
+    {"key": "kazuha", "name": "Kazuha", "url": "https://res.cloudinary.com/z2ffqaaf/image/upload/v1787983504/Kaedehara_Kazuha_Dynamic_Skin_zmxmbv.webp", "rarity": "5L"},
     {"key": "mizuki", "name": "Mizuki", "url": "https://res.cloudinary.com/z2ffqaaf/image/upload/v1787824999/Yumemizuki_Mizuki_Dynamic_Skin_na6bna.webp", "rarity": "5S"},
     {"key": "qiqi", "name": "Qiqi", "url": "https://res.cloudinary.com/z2ffqaaf/image/upload/v1787824906/Qiqi_Dynamic_Skin_fiasxj.webp", "rarity": "5S"},
     {"key": "jean", "name": "Jean", "url": "https://res.cloudinary.com/z2ffqaaf/image/upload/v1787824652/Jean_Dynamic_Skin_qsanxc.webp", "rarity": "5S"},
