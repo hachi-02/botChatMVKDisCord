@@ -13,7 +13,7 @@ from config import (
 from game.pvp.ui import start_pvp_challenge, handle_pvp_rank, handle_card_info, handle_show_card, is_in_pvp
 from game.pvp.cards import find_card
 from web_server import start_web_server
-from db import init_db, get_gems
+from db import init_db, get_gems, log_message
 from points import maybe_award_points, handle_assets, handle_daily
 from gacha.gacha import handle_gacha, handle_collection, GachaView
 from features.scheduler import (
@@ -31,6 +31,7 @@ from features.server_tools import (
 )
 from features.chat import handle_chat, handle_summary
 from features.voice import handle_voice_join, handle_voice_leave
+from features.report import weekly_report_checker
 
 intents = discord.Intents.default()
 intents.members = True
@@ -48,6 +49,7 @@ async def on_ready():
     bot.loop.create_task(event_reminder_checker(bot))
     bot.loop.create_task(scan_server_history(bot))
     bot.loop.create_task(idle_checker(bot))
+    bot.loop.create_task(weekly_report_checker(bot))
     if not getattr(bot, "_db_inited", False):
         try:
             await init_db()
@@ -89,6 +91,8 @@ async def on_message(message):
         return
 
     note_activity(message)
+
+    await log_message(message.author.id, message.channel.id, message.guild.id)
 
     await maybe_award_points(message, bot)
 

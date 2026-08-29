@@ -41,6 +41,22 @@ PVP_SCHEMA_SQL = (
     " last TIMESTAMPTZ);",
 )
 
+REPORT_SCHEMA_SQL = (
+    "CREATE TABLE IF NOT EXISTS msg_log ("
+    " id BIGSERIAL PRIMARY KEY,"
+    " user_id BIGINT NOT NULL,"
+    " channel_id BIGINT NOT NULL,"
+    " guild_id BIGINT NOT NULL,"
+    " at TIMESTAMPTZ NOT NULL DEFAULT now());",
+    "CREATE INDEX IF NOT EXISTS idx_msg_log_week ON msg_log (at, guild_id);",
+    "CREATE TABLE IF NOT EXISTS xp_snapshot ("
+    " guild_id BIGINT NOT NULL,"
+    " user_id BIGINT NOT NULL,"
+    " xp INTEGER NOT NULL,"
+    " at TIMESTAMPTZ NOT NULL DEFAULT now(),"
+    " PRIMARY KEY (guild_id, user_id));",
+)
+
 
 def _clean_dsn(dsn: str) -> str:
     """asyncpg không hiểu một số param của Neon (vd channel_binding)."""
@@ -58,6 +74,8 @@ async def _ensure_schema():
         for s in GACHA_SCHEMA_SQL:
             await conn.execute(s)
         for s in PVP_SCHEMA_SQL:
+            await conn.execute(s)
+        for s in REPORT_SCHEMA_SQL:
             await conn.execute(s)
         await conn.execute(
             "ALTER TABLE gacha_cards ADD COLUMN IF NOT EXISTS lvl INT NOT NULL DEFAULT 1"
@@ -94,6 +112,8 @@ async def init_db():
         for s in GACHA_SCHEMA_SQL:
             await conn.execute(s)
         for s in PVP_SCHEMA_SQL:
+            await conn.execute(s)
+        for s in REPORT_SCHEMA_SQL:
             await conn.execute(s)
         await conn.execute(
             "ALTER TABLE gacha_cards ADD COLUMN IF NOT EXISTS lvl INT NOT NULL DEFAULT 1"
@@ -374,6 +394,115 @@ async def update_pvp_result(
         )
     except Exception as e:
         print(f"LỖI UPDATE_PVP_RESULT: {type(e).__name__}: {e}", flush=True)
+
+
+async def log_message(user_id: int, channel_id: int, guild_id: int):
+    """Ghi 1 tin nhắn người dùng vào msg_log (phục vụ báo cáo tuần)."""
+    if db_pool is None:
+        return
+    try:
+        await _ensure_schema()
+        await db_pool.execute(
+            "INSERT INTO msg_log(user_id, channel_id, guild_id, at) VALUES($1,$2,$3,now())",
+            user_id, channel_id, guild_id,
+        )
+    except Exception as e:
+        print(f"LỖI LOG_MESSAGE: {type(e).__name__}: {e}", flush=True)
+
+
+async def cleanup_msg_log(days: int = 30):
+    """Xoá bản ghi msg_log cũ hơn `days` ngày để bảng không phình."""
+    if db_pool is None:
+        return
+    try:
+        await _ensure_schema()
+        await db_pool.execute(
+            "DELETE FROM msg_log WHERE at < now() - make_interval(days => $1)", days
+        )
+    except Exception as e:
+        print(f"LỖI CLEANUP_MSG_LOG: {type(e).__name__}: {e}", flush=True)
+
+
+async def get_week_top_msg(guild_id: int, start) -> dict:
+    """Người đứng #1 về số tin nhắn từ mốc `start` — trả {user_id, count} hoặc None."""
+    if db_pool is None:
+        return None
+    await _ensure_schema()
+    row = await db_pool.fetchrow(
+        "SELECT user_id, COUNT(*) AS cnt FROM msg_log "
+        "WHERE guild_id=$1 AND at >= $2 "
+        "GROUP BY user_id ORDER BY cnt DESC LIMIT 1",
+        guild_id, start,
+    )
+    return {"user_id": row["user_id"], "count": row["cnt"]} if row else None
+
+
+async def get_week_bottom_msg(guild_id: int, start) -> dict:
+    """Người đứng #1 (ít nhất) về số tin nhắn từ mốc `start` — trả {user_id, count}."""
+    if db_pool is None:
+        return None
+    await _ensure_schema()
+    row = await db_pool.fetchrow(
+        "SELECT user_id, COUNT(*) AS cnt FROM msg_log "
+        "WHERE guild_id=$1 AND at >= $2 "
+        "GROUP BY user_id ORDER BY cnt ASC LIMIT 1",
+        guild_id, start,
+    )
+    return {"user_id": row["user_id"], "count": row["cnt"]} if row else None
+
+
+async def get_week_top_channel(guild_id: int, start) -> dict:
+    """Kênh đứng #1 về số tin nhắn từ mốc `start` — trả {channel_id, count}."""
+    if db_pool is None:
+        return None
+    await _ensure_schema()
+    row = await db_pool.fetchrow(
+        "SELECT channel_id, COUNT(*) AS cnt FROM msg_log "
+        "WHERE guild_id=$1 AND at >= $2 "
+        "GROUP BY channel_id ORDER BY cnt DESC LIMIT 1",
+        guild_id, start,
+    )
+    return {"channel_id": row["channel_id"], "count": row["cnt"]} if row else None
+
+
+async def save_xp_snapshot(guild_id: int, xp_map: dict):
+    """Lưu (user_id -> xp) hiện tại để tuần sau tính delta. Overwrite toàn bộ guild."""
+    if db_pool is None:
+        return
+    try:
+        await _ensure_schema()
+        async with db_pool.acquire() as conn:
+            async with conn.transaction():
+                await conn.execute(
+                    "DELETE FROM xp_snapshot WHERE guild_id=$1", guild_id
+                )
+                for uid, xp in xp_map.items():
+                    await conn.execute(
+                        "INSERT INTO xp_snapshot(guild_id, user_id, xp, at) VALUES($1,$2,$3,now())",
+                        guild_id, uid, xp,
+                    )
+    except Exception as e:
+        print(f"LỖI SAVE_XP_SNAPSHOT: {type(e).__name__}: {e}", flush=True)
+
+
+async def get_xp_snapshot(guild_id: int) -> dict:
+    """Trả {user_id: xp} đã chụp ở lần report trước. Rỗng nếu chưa có."""
+    if db_pool is None:
+        return {}
+    await _ensure_schema()
+    rows = await db_pool.fetch(
+        "SELECT user_id, xp FROM xp_snapshot WHERE guild_id=$1", guild_id
+    )
+    return {r["user_id"]: r["xp"] for r in rows}
+
+
+async def get_all_xp(guild_id: int) -> dict:
+    """Trả {user_id: total_xp} hiện tại của mọi người có điểm trong server này."""
+    if db_pool is None:
+        return {}
+    await _ensure_schema()
+    rows = await db_pool.fetch("SELECT user_id, total_xp FROM points")
+    return {r["user_id"]: r["total_xp"] for r in rows}
 
 
 async def claim_daily(user_id: int, gems: int, mora: int) -> bool:
