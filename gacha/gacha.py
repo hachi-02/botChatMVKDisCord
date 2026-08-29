@@ -167,6 +167,19 @@ class GachaView(discord.ui.View):
         self.bot = bot
         self.author = author
         self.message = None
+        # Tạo 2 nút và bỏ vào trong container (View/ActionRow)
+        self.btn_1 = discord.ui.Button(
+            label="🎯 Quay 1 lần (50❖)",
+            style=discord.ButtonStyle.primary,
+            callback=lambda i: self._run(i, 1),
+        )
+        self.btn_5 = discord.ui.Button(
+            label="🎯 Quay 5 lần (250❖)",
+            style=discord.ButtonStyle.success,
+            callback=lambda i: self._run(i, 5),
+        )
+        self.add_item(self.btn_1)
+        self.add_item(self.btn_5)
 
     async def on_timeout(self):
         for item in self.children:
@@ -178,14 +191,6 @@ class GachaView(discord.ui.View):
 
     async def interaction_check(self, interaction):
         return interaction.user.id == self.author.id
-
-    @discord.ui.button(label="🎯 Quay 1 lần (50đ)", style=discord.ButtonStyle.primary)
-    async def quay_1(self, interaction, button):
-        await self._run(interaction, 1)
-
-    @discord.ui.button(label="🎯 Quay 5 lần (250đ)", style=discord.ButtonStyle.success)
-    async def quay_5(self, interaction, button):
-        await self._run(interaction, 5)
 
     async def _run(self, interaction, n):
         if is_in_pvp(interaction.user.id):
