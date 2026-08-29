@@ -109,3 +109,9 @@ PVP_DODGE_FACTOR = 0.15
 PVP_DODGE_CAP = 0.30
 PVP_BATTLE_ANIM_GIF = "https://res.cloudinary.com/z2ffqaaf/image/upload/v1787884964/giphy_felw8m.gif"
 PVP_CHALLENGE_GIF = "https://res.cloudinary.com/z2ffqaaf/image/upload/v1787884708/giphy_l5i3pz.gif"
+
+CHAR_MAX_LEVEL = 90
+LEVEL_COST_PER = 500
+LEVEL_HP_BONUS = 10
+LEVEL_ATK_BONUS = 2
+LEVEL_SPD_BONUS = 0.2

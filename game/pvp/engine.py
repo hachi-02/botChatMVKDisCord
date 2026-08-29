@@ -6,17 +6,19 @@ from .cards import ELEMENT_ADVANTAGE, ELEM_STRONG, ELEM_WEAK
 
 
 class Fighter:
-    def __init__(self, card: dict):
+    def __init__(self, card: dict, lvl: int = 1):
         self.key = card["key"]
         self.name = card["name"]
         self.url = card["url"]
         self.rarity = card["rarity"]
         self.role = card["role"]
         self.element = card["element"]
-        self.atk = card["atk"]
-        self.max_hp = card["hp"]
-        self.hp = card["hp"]
-        self.spd = card["spd"]
+        self.lvl = lvl
+        bonus = lvl - 1
+        self.atk = card["atk"] + 2 * bonus
+        self.max_hp = card["hp"] + 10 * bonus
+        self.hp = self.max_hp
+        self.spd = card["spd"] + 0.2 * bonus
         self.crit_rate = card["crit_rate"]
         self.crit_dmg = card["crit_dmg"]
         self.skill = card["skill"]
@@ -178,9 +180,12 @@ def _needs_target(eff: dict) -> bool:
 
 # ===================== BATTLE SESSION =====================
 class BattleSession:
-    def __init__(self, a_cards, b_cards, a_user, b_user, channel, bot):
-        self.team_a = [Fighter(c) for c in a_cards]
-        self.team_b = [Fighter(c) for c in b_cards]
+    def __init__(self, a_cards, b_cards, a_user, b_user, channel, bot,
+                 a_levels=None, b_levels=None):
+        a_levels = a_levels or {}
+        b_levels = b_levels or {}
+        self.team_a = [Fighter(c, a_levels.get(c["key"], 1)) for c in a_cards]
+        self.team_b = [Fighter(c, b_levels.get(c["key"], 1)) for c in b_cards]
         self.a_user = a_user
         self.b_user = b_user
         self.channel = channel

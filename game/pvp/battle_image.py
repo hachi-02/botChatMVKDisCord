@@ -110,7 +110,7 @@ def _draw_card(img, draw, row_y, fighter, team_color, side):
     role_color = ROLE_COLOR.get(fighter.role, 0x95A5A6)
 
     if side == "L":
-        _text(draw, (info_x, row_y + 4), fighter.name, 30, WHITE)
+        _text(draw, (info_x, row_y + 4), f"{fighter.name}  Lv{fighter.lvl}", 30, WHITE)
         _text(draw, (info_x, row_y + 40), ROLE_LABEL.get(fighter.role, fighter.role), 19,
               _hex(role_color))
         _bar(draw, info_x, row_y + 72, BAR_W, HP_BAR_H, pct, hp_color)
@@ -130,7 +130,7 @@ def _draw_card(img, draw, row_y, fighter, team_color, side):
             if extra:
                 _text(draw, (info_x, row_y + 192), "  ".join(extra), 20, GOLD)
     else:
-        _text(draw, (info_x, row_y + 4), fighter.name, 30, WHITE, anchor="ra")
+        _text(draw, (info_x, row_y + 4), f"{fighter.name}  Lv{fighter.lvl}", 30, WHITE, anchor="ra")
         _text(draw, (info_x, row_y + 40), ROLE_LABEL.get(fighter.role, fighter.role), 19,
               _hex(role_color), anchor="ra")
         _bar(draw, info_x - BAR_W, row_y + 72, BAR_W, HP_BAR_H, pct, hp_color)

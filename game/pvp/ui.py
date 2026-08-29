@@ -12,12 +12,21 @@ from config import (
     PVP_START_RATING,
     PVP_BATTLE_ANIM_GIF,
     PVP_CHALLENGE_GIF,
+    CHAR_MAX_LEVEL,
+    LEVEL_COST_PER,
+    LEVEL_HP_BONUS,
+    LEVEL_ATK_BONUS,
+    LEVEL_SPD_BONUS,
 )
 from db import (
     get_collection,
     get_pvp_rating,
     get_pvp_top,
     update_pvp_result,
+    get_char_level,
+    set_char_level,
+    get_mora,
+    spend_mora,
 )
 from .cards import (
     get_card,
@@ -84,6 +93,8 @@ class PVPSession:
         self.channel = channel
         self.a_cards = None
         self.b_cards = None
+        self.a_levels = {}
+        self.b_levels = {}
         self.first_user = None
         self.second_user = None
         self.done = False
@@ -307,8 +318,16 @@ class TeamSelectView(discord.ui.View):
         chosen = [get_card(v) for v in vals]
         if self.side == "A":
             self.session.a_cards = chosen
+            self.session.a_levels = {
+                v: await get_char_level(self.session.user_for_side("A").id, v)
+                for v in vals
+            }
         else:
             self.session.b_cards = chosen
+            self.session.b_levels = {
+                v: await get_char_level(self.session.user_for_side("B").id, v)
+                for v in vals
+            }
         for item in self.children:
             item.disabled = True
         await interaction.response.edit_message(view=self)
@@ -336,6 +355,7 @@ async def _begin_selection(interaction, session: PVPSession, side: str):
     user = session.user_for_side(side)
     rows = await get_collection(user.id)
     owned = {r["char_key"]: r["dup_count"] for r in rows}
+    lvls = {r["char_key"]: r["lvl"] for r in rows}
     cards = [c for k in owned if (c := get_card(k))]
     if len(cards) < PVP_TEAM_SIZE:
         session.cancelled = True
@@ -351,7 +371,7 @@ async def _begin_selection(interaction, session: PVPSession, side: str):
     max_pick = min(PVP_TEAM_SIZE, len(cards))
     options = [
         discord.SelectOption(
-            label=f"{c['name']} ({'5★' if c['rarity'].startswith('5') else '4★'})",
+            label=f"{c['name']} Lv{lvls.get(c['key'], 1)} ({'5★' if c['rarity'].startswith('5') else '4★'})",
             value=c["key"],
             description=f"{ROLE_LABEL[c['role']]} • {element_name(c['element'])}",
             emoji=ELEMENT_EMOJI.get(c["element"], "❔"),
@@ -590,6 +610,7 @@ async def _resolve(session: PVPSession, interaction: discord.Interaction):
         session.a_cards, session.b_cards,
         session.user_for_side("A"), session.user_for_side("B"),
         interaction.channel, interaction.client,
+        a_levels=session.a_levels, b_levels=session.b_levels,
     )
     battle.confirm_msgs = session.confirm_msgs
     battle.announce_msgs = session.announce_msgs
@@ -769,10 +790,20 @@ def _effect_desc(eff: dict) -> str:
     return eff.get("name", "Kỹ năng")
 
 
-def _card_info_embed(card, owned_count):
+def _card_stats(card, lvl):
+    bonus = lvl - 1
+    return (
+        card["hp"] + LEVEL_HP_BONUS * bonus,
+        card["atk"] + LEVEL_ATK_BONUS * bonus,
+        card["spd"] + LEVEL_SPD_BONUS * bonus,
+    )
+
+
+def _card_info_embed(card, owned_count, lvl=1):
     stars = "★★★★★" if card["rarity"].startswith("5") else "★★★★"
+    hp, atk, spd = _card_stats(card, lvl)
     e = discord.Embed(
-        title=f"{ELEMENT_EMOJI.get(card['element'], '❔')} {card['name']} [{ROLE_LABEL[card['role']]}]",
+        title=f"{ELEMENT_EMOJI.get(card['element'], '❔')} {card['name']} Lv{lvl} [{ROLE_LABEL[card['role']]}]",
         color=PVP_COLOR,
     )
     try:
@@ -785,7 +816,7 @@ def _card_info_embed(card, owned_count):
         inline=False,
     )
     e.add_field(
-        name=f"❤️ HP: {card['hp']} · ⚔️ ATK: {card['atk']} · 💨 SPD: {card['spd']}",
+        name=f"❤️ HP: {hp} · ⚔️ ATK: {atk} · 💨 SPD: {spd}",
         value="\u200b",
         inline=False,
     )
@@ -793,6 +824,134 @@ def _card_info_embed(card, owned_count):
     e.add_field(name=f"✨ Ultimate · {card['ultimate']['name']}", value=_effect_desc(card["ultimate"]), inline=False)
     e.set_footer(text=f"💠 Đã sở hữu x{owned_count}")
     return e
+
+
+def _level_up_embed(card, lvl, mora):
+    e = discord.Embed(
+        title=f"⬆️ Nâng cấp {card['name']}",
+        description=f"**Cấp {lvl}/{CHAR_MAX_LEVEL}**\n{_bar(lvl, CHAR_MAX_LEVEL, 15)}",
+        color=PVP_COLOR,
+    )
+    try:
+        e.set_thumbnail(url=card["url"])
+    except Exception:
+        pass
+    hp, atk, spd = _card_stats(card, lvl)
+    e.add_field(name="❤️ HP", value=f"{hp}", inline=True)
+    e.add_field(name="⚔️ ATK", value=f"{atk}", inline=True)
+    e.add_field(name="💨 SPD", value=f"{spd:.1f}", inline=True)
+    e.add_field(
+        name="⚡ Tăng mỗi cấp",
+        value=f"+{LEVEL_HP_BONUS} HP · +{LEVEL_ATK_BONUS} ATK · +{LEVEL_SPD_BONUS} SPD",
+        inline=False,
+    )
+    if lvl < CHAR_MAX_LEVEL:
+        cost = LEVEL_COST_PER
+        e.add_field(
+            name="💰 Chi phí",
+            value=f"{cost}🪙 / cấp  ·  Em có **{mora}🪙**",
+            inline=False,
+        )
+    else:
+        e.add_field(name="🏆", value="Đã đạt **MAX LEVEL** 🎉", inline=False)
+    return e
+
+
+class LevelUpView(discord.ui.View):
+    def __init__(self, author, card, lvl, owned_count=1):
+        super().__init__(timeout=180)
+        self.author = author
+        self.card = card
+        self.lvl = lvl
+        self.owned_count = owned_count
+        self.mode = "card"
+        self._build_card_mode()
+
+    def _build_card_mode(self):
+        self.clear_items()
+        self.btn_level = discord.ui.Button(label="⬆️ Lên cấp", style=discord.ButtonStyle.success)
+        self.btn_level.callback = self._open_level
+        self.btn_const = discord.ui.Button(label="🔮 Cung mệnh (sớm)", style=discord.ButtonStyle.secondary, disabled=True)
+        self.btn_const.callback = self._constellation
+        self.add_item(self.btn_level)
+        self.add_item(self.btn_const)
+
+    def _build_level_mode(self):
+        self.clear_items()
+        self.btn_back = discord.ui.Button(label="◀️ Quay lại", style=discord.ButtonStyle.secondary)
+        self.btn_back.callback = self._back
+        self.btn_1 = discord.ui.Button(label=f"⬆️ +1 ({LEVEL_COST_PER}🪙)", style=discord.ButtonStyle.primary)
+        self.btn_1.callback = lambda i: self._level_up(i, 1)
+        self.btn_10 = discord.ui.Button(label=f"⬆️ +10 ({LEVEL_COST_PER*10}🪙)", style=discord.ButtonStyle.primary)
+        self.btn_10.callback = lambda i: self._level_up(i, 10)
+        self.btn_1.disabled = self.lvl >= CHAR_MAX_LEVEL
+        self.btn_10.disabled = self.lvl >= CHAR_MAX_LEVEL
+        self.add_item(self.btn_back)
+        self.add_item(self.btn_1)
+        self.add_item(self.btn_10)
+
+    async def _refresh(self, interaction, embed):
+        try:
+            await interaction.response.edit_message(embed=embed, view=self)
+        except Exception:
+            pass
+
+    async def _open_level(self, interaction):
+        if interaction.user.id != self.author.id:
+            await _ephemerals.send(interaction, "Không phải thẻ của em!")
+            return
+        self.mode = "level"
+        self._build_level_mode()
+        mora = await get_mora(self.author.id)
+        await self._refresh(interaction, _level_up_embed(self.card, self.lvl, mora))
+
+    async def _back(self, interaction):
+        if interaction.user.id != self.author.id:
+            await _ephemerals.send(interaction, "Không phải thẻ của em!")
+            return
+        self.mode = "card"
+        self._build_card_mode()
+        await self._refresh(interaction, _card_info_embed(self.card, self.owned_count, self.lvl))
+
+    async def _constellation(self, interaction):
+        await _ephemerals.send(interaction, "🔮 Cung mệnh sắp ra mắt, đợi chị nhé 🐟")
+
+    async def _level_up(self, interaction, amount):
+        if interaction.user.id != self.author.id:
+            await _ephemerals.send(interaction, "Không phải thẻ của em!")
+            return
+        if self.lvl >= CHAR_MAX_LEVEL:
+            await _ephemerals.send(interaction, "🏆 Đã MAX LEVEL rồi em!")
+            return
+        remaining = CHAR_MAX_LEVEL - self.lvl
+        actual = min(amount, remaining)
+        cost = LEVEL_COST_PER * actual
+        mora = await get_mora(self.author.id)
+        if mora < cost:
+            await _ephemerals.send(
+                interaction,
+                f"⚠️ Thiếu **{cost - mora}🪙** mora để nâng (cần {cost}🪙)!",
+            )
+            return
+        ok = await spend_mora(self.author.id, cost)
+        if not ok:
+            await _ephemerals.send(interaction, "⚠️ Không đủ mora để nâng cấp!")
+            return
+        new_lvl = self.lvl + actual
+        await set_char_level(self.author.id, self.card["key"], new_lvl)
+        self.lvl = new_lvl
+        self._build_level_mode()
+        mora = await get_mora(self.author.id)
+        await self._refresh(interaction, _level_up_embed(self.card, self.lvl, mora))
+
+    async def on_timeout(self):
+        for item in self.children:
+            item.disabled = True
+        if self.message is not None:
+            try:
+                await self.message.edit(view=self)
+            except Exception:
+                pass
 
 
 async def handle_card_info(channel, author, card):
@@ -804,7 +963,10 @@ async def handle_card_info(channel, author, card):
             f"🔒 Em chưa sở hữu **{card['name']}**! Quay gacha nè 🎴"
         )
         return
-    await channel.send(embed=_card_info_embed(card, count))
+    lvl = await get_char_level(author.id, card["key"])
+    view = LevelUpView(author, card, lvl, count)
+    msg = await channel.send(embed=_card_info_embed(card, count, lvl), view=view)
+    view.message = msg
 
 
 def _team_preview_cards(user, cards) -> list:
@@ -843,7 +1005,7 @@ def _fighter_field(e, f):
     mark = _fighter_status_mark(f)
     badge = f"{ELEMENT_EMOJI.get(f.element,'❔')}"
     e.add_field(
-        name=f"{mark} {badge} {f.name}",
+        name=f"{mark} {badge} {f.name} Lv{f.lvl}",
         value=_fighter_card_value(f),
         inline=True,
     )

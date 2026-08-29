@@ -103,7 +103,7 @@ MENU_PAGES = [
         [
             ("📊 Vote", "`chị cá` + `vote Câu hỏi? | chọn 1 | chọn 2`"),
             ("⏰ Nhắc", "`chị cá` + `nhắc em 7h học bài`"),
-            ("📅 Điểm danh", "`chị cá` + `daily` (mỗi ngày +10❖ +500🪙)"),
+            ("📅 Điểm danh", "`chị cá` + `daily` (mỗi ngày +10💠 +500🪙)"),
             ("📅 Sự kiện", "`chị cá tạo sự kiện` + `Tên | thời gian | mô tả | địa điểm`"),
             ("🔗 Lời mời", "`chị cá` + `tạo link mời`"),
         ],

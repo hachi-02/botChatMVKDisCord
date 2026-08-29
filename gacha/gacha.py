@@ -132,16 +132,17 @@ async def handle_gacha(channel, author, bot, n):
 async def handle_collection(channel, author, bot):
     uid = author.id
     rows = await get_collection(uid)
-    owned = {r["char_key"]: r["dup_count"] for r in rows}
+    owned = {r["char_key"]: (r["dup_count"], r["lvl"]) for r in rows}
     five = []
     four = []
     locked = []
     for c in CHARACTER_POOL:
         sao = "5★" if c["rarity"].startswith("5") else "4★"
         if c["key"] in owned:
+            cnt, lvl = owned[c["key"]]
             emoji = "🟡" if c["rarity"].startswith("5") else "🟣"
             (five if c["rarity"].startswith("5") else four).append(
-                f"{emoji} {c['name']} ({sao}) x{owned[c['key']]}"
+                f"{emoji} {c['name']} ({sao}) Lv{lvl} x{cnt}"
             )
         else:
             locked.append(f"🔒 {c['name']} ({sao}) x0")
@@ -153,7 +154,7 @@ async def handle_collection(channel, author, bot):
     if locked:
         blocks.append("\n".join(locked))
     desc = "\n\n".join(blocks) if blocks else "Chưa có thẻ nào."
-    total = sum(owned.values())
+    total = sum(v[0] for v in owned.values())
     e = discord.Embed(title=f"🎴 Kho thẻ của {author.display_name}", color=EMBED_COLOR)
     e.description = desc
     e.set_footer(text=f"Đã có {len(owned)}/22 • {total} thẻ")

@@ -98,7 +98,7 @@ async def handle_daily(message, bot):
             color=EMBED_COLOR,
         )
         _author(e, bot)
-        e.add_field(name="Nguyên thạch", value=f"**{pts}❖**", inline=True)
+        e.add_field(name="Nguyên thạch", value=f"**{pts}💠**", inline=True)
         e.add_field(name="Mora", value=f"**{mora}🪙**", inline=True)
         await message.channel.send(embed=e, reference=message, mention_author=False)
         return
@@ -106,7 +106,7 @@ async def handle_daily(message, bot):
     mora = await get_mora(uid)
     e = discord.Embed(
         title="📅 Điểm danh thành công!",
-        description=f"{message.author.mention} nhận được **+{DAILY_GEMS}❖** và **+{DAILY_MORA}🪙** 🎉\nQuay lại vào ngày mai để nhận tiếp nhé!",
+        description=f"{message.author.mention} nhận được **+{DAILY_GEMS}💠** và **+{DAILY_MORA}🪙** 🎉\nQuay lại vào ngày mai để nhận tiếp nhé!",
         color=EMBED_COLOR,
     )
     _author(e, bot)

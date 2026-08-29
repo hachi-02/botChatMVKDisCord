@@ -27,6 +27,7 @@ GACHA_SCHEMA_SQL = (
     " char_key TEXT,"
     " rarity TEXT,"
     " dup_count INT NOT NULL DEFAULT 1,"
+    " lvl INT NOT NULL DEFAULT 1,"
     " first_at TIMESTAMPTZ DEFAULT now(),"
     " PRIMARY KEY (user_id, char_key));",
 )
@@ -58,6 +59,9 @@ async def _ensure_schema():
             await conn.execute(s)
         for s in PVP_SCHEMA_SQL:
             await conn.execute(s)
+        await conn.execute(
+            "ALTER TABLE gacha_cards ADD COLUMN IF NOT EXISTS lvl INT NOT NULL DEFAULT 1"
+        )
         await conn.execute(
             "ALTER TABLE points DROP COLUMN IF EXISTS max_level"
         )
@@ -91,6 +95,9 @@ async def init_db():
             await conn.execute(s)
         for s in PVP_SCHEMA_SQL:
             await conn.execute(s)
+        await conn.execute(
+            "ALTER TABLE gacha_cards ADD COLUMN IF NOT EXISTS lvl INT NOT NULL DEFAULT 1"
+        )
         await conn.execute(
             "ALTER TABLE points DROP COLUMN IF EXISTS max_level"
         )
@@ -204,6 +211,28 @@ async def spend_gems(user_id: int, n: int) -> bool:
         return False
 
 
+async def spend_mora(user_id: int, n: int) -> bool:
+    global _no_db_warned
+    if db_pool is None:
+        if not _no_db_warned:
+            print("WARN: db_pool is None - bỏ qua trừ mora (không có RAM fallback).", flush=True)
+            _no_db_warned = True
+        return False
+    try:
+        await _ensure_schema()
+        row = await db_pool.fetchrow("SELECT mora FROM points WHERE user_id=$1", user_id)
+        cur = row["mora"] if row else 0
+        if cur < n:
+            return False
+        await db_pool.execute(
+            "UPDATE points SET mora = mora - $2 WHERE user_id=$1", user_id, n
+        )
+        return True
+    except Exception as e:
+        print(f"LỖI SPEND_MORA: {type(e).__name__}: {e}", flush=True)
+        return False
+
+
 async def get_state(user_id: int):
     if db_pool is None:
         return {"pity5": 0, "pity4": 0, "guarantee5": False}
@@ -254,10 +283,34 @@ async def get_collection(user_id: int):
         return []
     await _ensure_schema()
     return await db_pool.fetch(
-        "SELECT char_key, rarity, dup_count FROM gacha_cards WHERE user_id=$1 "
+        "SELECT char_key, rarity, dup_count, lvl FROM gacha_cards WHERE user_id=$1 "
         "ORDER BY rarity, char_key",
         user_id,
     )
+
+
+async def get_char_level(user_id: int, char_key: str) -> int:
+    if db_pool is None:
+        return 1
+    await _ensure_schema()
+    row = await db_pool.fetchrow(
+        "SELECT lvl FROM gacha_cards WHERE user_id=$1 AND char_key=$2",
+        user_id, char_key,
+    )
+    return row["lvl"] if row else 1
+
+
+async def set_char_level(user_id: int, char_key: str, lvl: int):
+    if db_pool is None:
+        return
+    try:
+        await _ensure_schema()
+        await db_pool.execute(
+            "UPDATE gacha_cards SET lvl=$3 WHERE user_id=$1 AND char_key=$2",
+            user_id, char_key, lvl,
+        )
+    except Exception as e:
+        print(f"LỖI SET_CHAR_LEVEL: {type(e).__name__}: {e}", flush=True)
 
 
 async def get_pvp_rating(user_id: int):
