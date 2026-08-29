@@ -157,6 +157,65 @@ def _apply_effect(caster: Fighter, team: list, enemy: list, eff: dict, log: list
         for ally in team:
             ally.atk_buff += p2
         log.append(f"{tag}: {heal_txt}toàn đội +{int(p2*100)}% ATK 💚⬆️")
+    elif t == "ST_DMG_DEBUFF":
+        if target and target.alive:
+            dmg, crit, dodged = _compute_damage(caster, target, p)
+            if dodged:
+                log.append(f"{tag}: {target.name} né đòn 💨")
+            else:
+                target.def_debuff += p2
+                log.append(f"{tag}: {target.name} -{dmg} HP{' 💥' if crit else ''} "
+                           f"và nhận thêm +{int(p2*100)}% sát thương 🔻")
+    elif t == "AOE_DMG_DEBUFF":
+        for e in enemy:
+            if e.alive:
+                dmg, crit, dodged = _compute_damage(caster, e, p)
+                if dodged:
+                    log.append(f"{tag}: {e.name} né đòn 💨")
+                else:
+                    e.def_debuff += p2
+                    log.append(f"{tag}: {e.name} -{dmg} HP{' 💥' if crit else ''}")
+        log.append(f"{tag}: toàn địch nhận thêm +{int(p2*100)}% sát thương 🔻")
+    elif t == "AOE_DMG_STUN":
+        for e in enemy:
+            if e.alive:
+                dmg, crit, dodged = _compute_damage(caster, e, p)
+                if dodged:
+                    log.append(f"{tag}: {e.name} né đòn 💨")
+                else:
+                    log.append(f"{tag}: {e.name} -{dmg} HP{' 💥' if crit else ''}")
+        if target and target.alive:
+            target.stunned = True
+            log.append(f"{tag}: {target.name} bị choáng ⭐")
+    elif t == "ST_LIFESTEAL":
+        if target and target.alive:
+            dmg, crit, dodged = _compute_damage(caster, target, p)
+            if dodged:
+                log.append(f"{tag}: {target.name} né đòn 💨")
+            else:
+                heal = max(1, round(dmg * p2))
+                caster.hp = min(caster.max_hp, caster.hp + heal)
+                log.append(f"{tag}: {target.name} -{dmg} HP{' 💥' if crit else ''} "
+                           f"và {caster.name} hút {heal} HP 💉")
+    elif t == "HEAL_ENERGY":
+        low = _lowest_alive(team)
+        heal_txt = ""
+        if low is not None:
+            before = low.hp
+            low.hp = min(low.max_hp, low.hp + p)
+            heal_txt = f"hồi {low.hp - before} HP cho {low.name}"
+        for ally in team:
+            ally.gain_energy(p2)
+        log.append(f"{tag}: {heal_txt} + toàn đội +{p2} nộ khí ⚡")
+    elif t == "STUN_ST_DMG":
+        if target and target.alive:
+            dmg, crit, dodged = _compute_damage(caster, target, p)
+            if dodged:
+                log.append(f"{tag}: {target.name} né đòn 💨")
+            else:
+                log.append(f"{tag}: {target.name} -{dmg} HP{' 💥' if crit else ''}")
+            target.stunned = True
+            log.append(f"{tag}: {target.name} bị choáng ⭐")
 
 
 def _basic_attack(attacker: Fighter, target: Fighter, log: list):
@@ -175,7 +234,10 @@ def _basic_attack(attacker: Fighter, target: Fighter, log: list):
 
 
 def _needs_target(eff: dict) -> bool:
-    return eff["type"] in ("ST_DMG", "STUN", "HEAL_ST_DMG")
+    return eff["type"] in (
+        "ST_DMG", "STUN", "HEAL_ST_DMG",
+        "ST_DMG_DEBUFF", "AOE_DMG_STUN", "ST_LIFESTEAL", "STUN_ST_DMG",
+    )
 
 
 # ===================== BATTLE SESSION =====================

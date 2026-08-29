@@ -532,7 +532,10 @@ class ControlPanelView(discord.ui.View):
             return
 
         eff = actor.skill if action == "skill" else (actor.ultimate if action == "ultimate" else None)
-        needs_target = action == "normal" or (eff is not None and eff["type"] in ("ST_DMG", "STUN", "HEAL_ST_DMG"))
+        needs_target = action == "normal" or (eff is not None and eff["type"] in (
+            "ST_DMG", "STUN", "HEAL_ST_DMG",
+            "ST_DMG_DEBUFF", "AOE_DMG_STUN", "ST_LIFESTEAL", "STUN_ST_DMG",
+        ))
         target = None
         if needs_target:
             tkey = target_select.values[0] if (target_select and target_select.values) else None
@@ -787,6 +790,18 @@ def _effect_desc(eff: dict) -> str:
         return f"Hồi {p} HP đồng đội thấp máu và gây sát thương đơn mục tiêu"
     if t == "HEAL_BUFF":
         return f"Hồi {p} HP đồng đội thấp máu và toàn đội +{int(p2*100)}% ATK"
+    if t == "ST_DMG_DEBUFF":
+        return f"Sát thương đơn mục tiêu (~x{p:.2f} ATK) + địch nhận thêm +{int(p2*100)}% sát thương"
+    if t == "AOE_DMG_DEBUFF":
+        return f"Sát thương toàn địch (~x{p:.2f} ATK) + mọi địch nhận thêm +{int(p2*100)}% sát thương"
+    if t == "AOE_DMG_STUN":
+        return f"Sát thương toàn địch (~x{p:.2f} ATK) + choáng mục tiêu 1 lượt"
+    if t == "ST_LIFESTEAL":
+        return f"Sát thương đơn mục tiêu (~x{p:.2f} ATK) + hút {int(p2*100)}% sát thương thành máu"
+    if t == "HEAL_ENERGY":
+        return f"Hồi {p} HP đồng đội thấp máu + toàn đội nạp +{p2} nộ khí"
+    if t == "STUN_ST_DMG":
+        return f"Choáng mục tiêu 1 lượt + gây sát thương đơn (~x{p:.2f} ATK)"
     return eff.get("name", "Kỹ năng")
 
 
