@@ -2,6 +2,7 @@ import asyncio
 import discord
 from datetime import datetime
 from zoneinfo import ZoneInfo
+from pilow_image.bag_pilow import create_bag
 
 from config import POINT_COOLDOWN, POINTS_PER_MSG, GEM_PER_MSG, MORA_PER_MSG, POINTS_PER_LEVEL, DAILY_GEMS, DAILY_MORA
 from db import add_rewards, get_gems, get_mora, get_rank, get_xp, claim_daily
@@ -64,27 +65,32 @@ async def maybe_award_points(message, bot):
 
 async def handle_assets(message, bot):
     target = message.mentions[0] if message.mentions else message.author
+
     pts = await get_gems(target.id)
     mora = await get_mora(target.id)
     rank = await get_rank(target.id)
     xp = await get_xp(target.id)
-    lvl = xp // POINTS_PER_LEVEL + 1
-    prog = xp % POINTS_PER_LEVEL
-    embed = discord.Embed(title=f"{target.display_name}", color=_rank_color(rank))
-    _author(embed, bot)
-    embed.set_thumbnail(url=target.display_avatar.url)
-    embed.add_field(name="Nguyên thạch", value=f"**{pts}💠**", inline=True)
-    embed.add_field(name="Mora", value=f"**{mora}🪙**", inline=True)
-    embed.add_field(name="Cấp", value=f"**{lvl}**", inline=True)
-    embed.add_field(
-        name="Tiến độ",
-        value=f"Lên Cấp {lvl+1}: [{_bar(prog)}] {prog}/{POINTS_PER_LEVEL} XP",
-        inline=False,
-    )
-    icon = message.guild.icon.url if (message.guild and message.guild.icon) else discord.Embed.Empty
-    embed.set_footer(text="Mỗi tin +5❖ +500🪙 +10 XP / 30s", icon_url=icon)
-    await message.channel.send(embed=embed, reference=message, mention_author=False)
 
+    lvl = xp // POINTS_PER_LEVEL + 1
+
+    image = await create_bag(
+        target=target,
+        gems=pts,
+        mora=mora,
+        rank=rank,
+        level=lvl,
+        xp=xp,
+        points_per_level=POINTS_PER_LEVEL,
+    )
+
+    await message.channel.send(
+        file=discord.File(
+            image,
+            filename="bag.png",
+        ),
+        reference=message,
+        mention_author=False,
+    )
 
 async def handle_daily(message, bot):
     uid = message.author.id
