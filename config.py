@@ -95,6 +95,9 @@ GACHA_KEYWORDS = ["gacha", "quay", "roll"]
 COLLECTION_KEYWORDS = ["sở hữu", "collection", "kho", "bộ sưu tập"]
 SHOW_KEYWORDS = ["show", "xem ảnh", "ảnh"]
 
+VOICE_IN_KEYWORDS = ["voicein", "giữ voice", "vào voice"]
+VOICE_OUT_KEYWORDS = ["voiceout", "rời voice", "out voice"]
+
 PVP_KEYWORDS = ["pvp", "pk", "thách đấu"]
 PVP_RANK_KEYWORDS = ["điểm", "top"]
 PVP_TEAM_SIZE = 3

@@ -20,6 +20,8 @@ from config import (
     GACHA_KEYWORDS,
     COLLECTION_KEYWORDS,
     SHOW_KEYWORDS,
+    VOICE_IN_KEYWORDS,
+    VOICE_OUT_KEYWORDS,
     PVP_KEYWORDS,
     PVP_RANK_KEYWORDS,
 )
@@ -43,6 +45,7 @@ from features.server_tools import (
     handle_poll,
 )
 from features.chat import handle_chat, handle_summary
+from features.voice import handle_voice_join, handle_voice_leave
 
 intents = discord.Intents.default()
 intents.members = True
@@ -207,6 +210,16 @@ async def on_message(message):
     )
     if is_show and card is not None:
         await handle_show_card(message.channel, card)
+        return
+
+    is_voice_out = addressed and any(kw in content_lower for kw in VOICE_OUT_KEYWORDS)
+    if is_voice_out:
+        await handle_voice_leave(message, bot)
+        return
+
+    is_voice_in = addressed and any(kw in content_lower for kw in VOICE_IN_KEYWORDS)
+    if is_voice_in:
+        await handle_voice_join(message, bot)
         return
 
     if await handle_chat(message, bot):
