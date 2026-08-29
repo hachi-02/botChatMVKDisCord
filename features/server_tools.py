@@ -185,16 +185,19 @@ async def handle_invite(message, bot):
         )
 
 
-# Xử lý lệnh "ôm" (vd: `chica hug @bạn`). Gửi 1 message: text + GIF ngẫu nhiên.
+# Xử lý lệnh "ôm" (vd: `chica hug @bạn`). Gửi 1 card (embed) chứa text + GIF.
 # Nếu không có @người nhận thì tự ôm bot.
 async def handle_hug(message, bot) -> bool:
     target = message.mentions[0] if message.mentions else bot.user
     gif = random.choice(HUG_GIFS)
-    await message.channel.send(
-        f"{message.author.mention} tặng cái ôm {target.mention} 🐟\n{gif}",
-        reference=message,
-        mention_author=False,
+    e = discord.Embed(
+        description=f"{message.author.mention} tặng cái ôm {target.mention} 🐟",
+        color=EMBED_COLOR,
     )
+    if bot.user:
+        e.set_author(name="Chị Cá 🐟", icon_url=bot.user.display_avatar.url)
+    e.set_image(url=gif)
+    await message.channel.send(embed=e, reference=message, mention_author=False)
     return True
 
 
