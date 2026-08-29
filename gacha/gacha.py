@@ -4,8 +4,8 @@ import random
 import discord
 
 from db import (
-    get_points,
-    spend_points,
+    get_gems,
+    spend_gems,
     get_state,
     set_state,
     add_card,
@@ -89,15 +89,15 @@ async def handle_gacha(channel, author, bot, n):
         return
     cost = GACHA_COST if n == 1 else GACHA_COST5
     uid = author.id
-    pts = await get_points(uid)
+    pts = await get_gems(uid)
     if pts < cost:
         await channel.send(
-            f"{author.mention} chưa đủ điểm quay {n} lần (cần **{cost}đ**, em có **{pts}đ**). "
-            f"Tích điểm mỗi tin nhắn nhé! 🐟"
+            f"{author.mention} chưa đủ nguyên thạch quay {n} lần (cần **{cost}❖**, em có **{pts}❖**). "
+            f"Tích nguyên thạch mỗi tin nhắn nhé! 🐟"
         )
         return
 
-    await spend_points(uid, cost)
+    await spend_gems(uid, cost)
     state = await get_state(uid)
     results = [roll_one(state) for _ in range(n)]
     await set_state(uid, state["pity5"], state["pity4"], state["guarantee5"])

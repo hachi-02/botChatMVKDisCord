@@ -81,9 +81,11 @@ EMOJI_MAP = {
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 
-POINT_KEYWORDS = ["điểm", "rank", "xếp hạng", "leaderboard", "top"]
+ASSET_KEYWORDS = ["tài sản", "tai san", "assets", "nguyên thạch", "mora"]
 POINT_COOLDOWN = 30
 POINTS_PER_MSG = 10
+GEM_PER_MSG = 5
+MORA_PER_MSG = 500
 POINTS_PER_LEVEL = 200
 
 GACHA_KEYWORDS = ["gacha", "quay", "roll"]

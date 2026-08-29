@@ -29,7 +29,7 @@ from config import (
     EVENT_REMIND_MINUTES,
     EVENT_DEFAULT_DURATION_MINUTES,
     DATABASE_URL,
-    POINT_KEYWORDS,
+    ASSET_KEYWORDS,
     POINT_COOLDOWN,
     POINTS_PER_MSG,
     POINTS_PER_LEVEL,
@@ -45,8 +45,8 @@ from ai import ai, get_system_prompt, clean_ai_response
 from memory import add_message, get_history, remember_user, get_known_users
 from search import search_web
 from web_server import start_web_server
-from db import init_db, get_points
-from points import maybe_award_points, handle_points, EMBED_COLOR, LEVELUP_GIF
+from db import init_db, get_gems
+from points import maybe_award_points, handle_assets, EMBED_COLOR, LEVELUP_GIF
 from gacha.gacha import handle_gacha, handle_collection, GachaView
 
 intents = discord.Intents.default()
@@ -109,8 +109,8 @@ MENU_PAGES = [
     (
         "🎮 Trò chơi & Điểm",
         [
-            ("🏆 Điểm", "`chị cá` + `điểm` / `top`"),
-            ("🎴 Gacha", "`chị cá` + `gacha` / `gacha 1` / `gacha 5` (50đ / 250đ)"),
+            ("💠 Tài sản", "`chị cá` + `tài sản` (xem nguyên thạch / mora / cấp)"),
+            ("🎴 Gacha", "`chị cá` + `gacha` / `gacha 1` / `gacha 5` (50❖ / 250❖)"),
             ("🗃️ Kho thẻ", "`chị cá` + `kho` (xem các thẻ đã có)"),
             ("⚔️ PvP", "`chị cá` + `pvp @người_chơi` (3v3 turn-based, ELO)"),
             ("🏆 Xếp hạng PvP", "`chị cá` + `pvp điểm` / `pvp top`"),
@@ -789,13 +789,13 @@ async def on_message(message):
         if n:
             await handle_gacha(message.channel, message.author, bot, n)
         else:
-            pts = await get_points(message.author.id)
+            pts = await get_gems(message.author.id)
             e = discord.Embed(
                 title="🎰 Gacha Thẻ Genshin",
-                description=f"💰 Điểm hiện có: **{pts}đ**\nChọn số lượt quay:",
+                description=f"💠 Nguyên thạch hiện có: **{pts}❖**\nChọn số lượt quay:",
                 color=EMBED_COLOR,
             )
-            e.set_footer(text="1 lần = 50đ • 5 lần = 250đ")
+            e.set_footer(text="1 lần = 50❖ • 5 lần = 250❖")
             view = GachaView(bot, message.author)
             g_msg = await message.channel.send(embed=e, view=view)
             view.message = g_msg
@@ -815,9 +815,9 @@ async def on_message(message):
             await start_pvp_challenge(message, bot)
         return
 
-    is_point = addressed and any(kw in content_lower for kw in POINT_KEYWORDS)
-    if is_point:
-        await handle_points(message, bot)
+    is_asset = addressed and any(kw in content_lower for kw in ASSET_KEYWORDS)
+    if is_asset:
+        await handle_assets(message, bot)
         return
 
     is_card_info = (

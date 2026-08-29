@@ -10,6 +10,7 @@ SCHEMA_SQL = (
     "CREATE TABLE IF NOT EXISTS points ("
     " user_id BIGINT PRIMARY KEY,"
     " points  INTEGER NOT NULL DEFAULT 0,"
+    " mora    INTEGER NOT NULL DEFAULT 0,"
     " msgs    INTEGER NOT NULL DEFAULT 0,"
     " last    TIMESTAMP);"
 )
@@ -60,6 +61,9 @@ async def _ensure_schema():
             "ALTER TABLE points DROP COLUMN IF EXISTS max_level"
         )
         await conn.execute(
+            "ALTER TABLE points ADD COLUMN IF NOT EXISTS mora INTEGER NOT NULL DEFAULT 0"
+        )
+        await conn.execute(
             "ALTER TABLE points ADD COLUMN IF NOT EXISTS total_xp INTEGER NOT NULL DEFAULT 0"
         )
         await conn.execute(
@@ -83,37 +87,56 @@ async def init_db():
             await conn.execute(s)
         for s in PVP_SCHEMA_SQL:
             await conn.execute(s)
+        await conn.execute(
+            "ALTER TABLE points DROP COLUMN IF EXISTS max_level"
+        )
+        await conn.execute(
+            "ALTER TABLE points ADD COLUMN IF NOT EXISTS mora INTEGER NOT NULL DEFAULT 0"
+        )
+        await conn.execute(
+            "ALTER TABLE points ADD COLUMN IF NOT EXISTS total_xp INTEGER NOT NULL DEFAULT 0"
+        )
     db_pool = pool
     _schema_ready = True
     print("Đã kết nối DB points thành công 🐟", flush=True)
 
 
-async def add_points(user_id: int, n: int):
+async def add_rewards(user_id: int, gems: int, mora: int, xp: int):
     global _no_db_warned
     if db_pool is None:
         if not _no_db_warned:
-            print("WARN: db_pool is None - bỏ qua ghi điểm (chưa kết nối DB, không có RAM fallback).", flush=True)
+            print("WARN: db_pool is None - bỏ qua ghi thưởng (chưa kết nối DB, không có RAM fallback).", flush=True)
             _no_db_warned = True
         return
     try:
         await _ensure_schema()
         await db_pool.execute(
-            "INSERT INTO points(user_id, points, total_xp, msgs, last) VALUES($1,$2,$2,1,now()) "
+            "INSERT INTO points(user_id, points, mora, total_xp, msgs, last) "
+            "VALUES($1,$2,$3,$4,1,now()) "
             "ON CONFLICT(user_id) DO UPDATE SET "
-            "points = points.points + $2, total_xp = points.total_xp + $2, "
+            "points = points.points + $2, mora = points.mora + $3, "
+            "total_xp = points.total_xp + $4, "
             "msgs = points.msgs + 1, last = now()",
-            user_id, n,
+            user_id, gems, mora, xp,
         )
     except Exception as e:
-        print(f"LỖI ADD_POINTS: {type(e).__name__}: {e}", flush=True)
+        print(f"LỖI ADD_REWARDS: {type(e).__name__}: {e}", flush=True)
 
 
-async def get_points(user_id: int) -> int:
+async def get_gems(user_id: int) -> int:
     if db_pool is None:
         return 0
     await _ensure_schema()
     row = await db_pool.fetchrow("SELECT points FROM points WHERE user_id=$1", user_id)
     return row["points"] if row else 0
+
+
+async def get_mora(user_id: int) -> int:
+    if db_pool is None:
+        return 0
+    await _ensure_schema()
+    row = await db_pool.fetchrow("SELECT mora FROM points WHERE user_id=$1", user_id)
+    return row["mora"] if row else 0
 
 
 async def get_level(user_id: int) -> int:
@@ -152,11 +175,11 @@ async def get_top(limit: int = 10):
     )
 
 
-async def spend_points(user_id: int, n: int) -> bool:
+async def spend_gems(user_id: int, n: int) -> bool:
     global _no_db_warned
     if db_pool is None:
         if not _no_db_warned:
-            print("WARN: db_pool is None - bỏ qua trừ điểm (không có RAM fallback).", flush=True)
+            print("WARN: db_pool is None - bỏ qua trừ nguyên thạch (không có RAM fallback).", flush=True)
             _no_db_warned = True
         return False
     try:
@@ -170,7 +193,7 @@ async def spend_points(user_id: int, n: int) -> bool:
         )
         return True
     except Exception as e:
-        print(f"LỖI SPEND_POINTS: {type(e).__name__}: {e}", flush=True)
+        print(f"LỖI SPEND_GEMS: {type(e).__name__}: {e}", flush=True)
         return False
 
 
