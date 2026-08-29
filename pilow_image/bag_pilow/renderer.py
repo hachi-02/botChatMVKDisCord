@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 import io
@@ -16,6 +15,46 @@ HEIGHT = 390
 
 BASE_DIR = Path(__file__).resolve().parent
 
+
+# ============================================================
+# ASSET ICONS
+# ============================================================
+
+GEM_ICON_PATH = BASE_DIR.parent.parent / "assets" / "imageIcon" / "Item_Primogem.webp"
+MORA_ICON_PATH = BASE_DIR.parent.parent / "assets" / "imageIcon" / "Item_Mora.webp"
+
+gem_icon = None
+mora_icon = None
+
+
+def _load_icons():
+    global gem_icon, mora_icon
+
+    if gem_icon is None:
+        try:
+            print("[ICON] Gem:", GEM_ICON_PATH)
+            print("[ICON] Gem exists:", GEM_ICON_PATH.is_file())
+
+            gem_icon = Image.open(
+                GEM_ICON_PATH
+            ).convert("RGBA")
+
+        except Exception as e:
+            print("[ICON] Lỗi load Gem:", e)
+            gem_icon = None
+
+    if mora_icon is None:
+        try:
+            print("[ICON] Mora:", MORA_ICON_PATH)
+            print("[ICON] Mora exists:", MORA_ICON_PATH.is_file())
+
+            mora_icon = Image.open(
+                MORA_ICON_PATH
+            ).convert("RGBA")
+
+        except Exception as e:
+            print("[ICON] Lỗi load Mora:", e)
+            mora_icon = None
 
 # ============================================================
 # COLORS
@@ -36,25 +75,31 @@ DARK_GRAY = (90, 90, 90, 255)
 XP_BACKGROUND = (55, 55, 55, 255)
 XP_FILL = (75, 190, 110, 255)
 
-# Resources
-GEM = (145, 145, 145, 255)
-MORA = (145, 145, 145, 255)
+# Fallback icons
+GEM = (100, 200, 220, 255)
+MORA = (210, 175, 80, 255)
 
 
 # ============================================================
 # FONT
 # ============================================================
 
-def get_font(size: int, bold: bool = False):
+def get_font(
+    size: int,
+    bold: bool = False,
+):
     """
-    Font chính trên Windows:
-        Segoe UI
-        Segoe UI Semibold / Bold
-        Arial fallback
+    Font chính:
+    - Windows: Segoe UI / Arial
+    - Linux/Render: DejaVu Sans / Liberation Sans
 
     Không dùng font custom nên tránh lỗi:
-        OSError: unknown file format
+    OSError: unknown file format
     """
+
+    # ========================================================
+    # WINDOWS
+    # ========================================================
 
     windows_fonts = Path(
         r"C:\Windows\Fonts"
@@ -62,14 +107,14 @@ def get_font(size: int, bold: bool = False):
 
     if bold:
         candidates = [
-            windows_fonts / "segoeuib.ttf",   # Segoe UI Bold
-            windows_fonts / "segoeuisb.ttf",  # Segoe UI Semibold
-            windows_fonts / "arialbd.ttf",    # Arial Bold
+            windows_fonts / "segoeuib.ttf",
+            windows_fonts / "segoeuisb.ttf",
+            windows_fonts / "arialbd.ttf",
         ]
     else:
         candidates = [
-            windows_fonts / "segoeui.ttf",    # Segoe UI
-            windows_fonts / "arial.ttf",      # Arial
+            windows_fonts / "segoeui.ttf",
+            windows_fonts / "arial.ttf",
         ]
 
     for path in candidates:
@@ -83,18 +128,24 @@ def get_font(size: int, bold: bool = False):
                 continue
 
     # ========================================================
-    # Linux / Render
+    # LINUX / RENDER
     # ========================================================
 
     if bold:
         linux_candidates = [
-            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-            "/usr/share/fonts/truetype/liberation2/LiberationSans-Bold.ttf",
+            "/usr/share/fonts/truetype/dejavu/"
+            "DejaVuSans-Bold.ttf",
+
+            "/usr/share/fonts/truetype/liberation2/"
+            "LiberationSans-Bold.ttf",
         ]
     else:
         linux_candidates = [
-            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-            "/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf",
+            "/usr/share/fonts/truetype/dejavu/"
+            "DejaVuSans.ttf",
+
+            "/usr/share/fonts/truetype/liberation2/"
+            "LiberationSans-Regular.ttf",
         ]
 
     for path in linux_candidates:
@@ -122,7 +173,7 @@ def rounded(
     radius,
     fill,
     outline=None,
-    width=1,
+    width=0,
 ):
     draw.rounded_rectangle(
         box,
@@ -159,7 +210,7 @@ def draw_center_vertical(
     fill,
 ):
     """
-    Vẽ text sao cho tâm chữ nằm đúng center_y.
+    Căn text chính xác theo chiều dọc.
     """
 
     bbox = draw.textbbox(
@@ -168,9 +219,15 @@ def draw_center_vertical(
         font=font,
     )
 
-    text_height = bbox[3] - bbox[1]
+    text_height = (
+        bbox[3] - bbox[1]
+    )
 
-    y = center_y - text_height / 2 - bbox[1]
+    y = (
+        center_y
+        - text_height / 2
+        - bbox[1]
+    )
 
     draw.text(
         (x, y),
@@ -199,8 +256,13 @@ def draw_center(
         font=font,
     )
 
-    text_width = bbox[2] - bbox[0]
-    text_height = bbox[3] - bbox[1]
+    text_width = (
+        bbox[2] - bbox[0]
+    )
+
+    text_height = (
+        bbox[3] - bbox[1]
+    )
 
     x = (
         x1
@@ -240,8 +302,13 @@ def draw_right_center(
         font=font,
     )
 
-    text_width = bbox[2] - bbox[0]
-    text_height = bbox[3] - bbox[1]
+    text_width = (
+        bbox[2] - bbox[0]
+    )
+
+    text_height = (
+        bbox[3] - bbox[1]
+    )
 
     x = (
         x_right
@@ -276,7 +343,12 @@ def draw_xp_card(
 ):
     x1 = 20
     x2 = WIDTH - 20
+
     height = 100
+
+    # ========================================================
+    # CARD
+    # ========================================================
 
     rounded(
         draw,
@@ -296,7 +368,9 @@ def draw_xp_card(
     # LEVEL
     # ========================================================
 
-    level_text = f"LEVEL {level}"
+    level_text = (
+        f"LEVEL {level}"
+    )
 
     level_font = get_font(
         28,
@@ -348,6 +422,7 @@ def draw_xp_card(
 
     bar_height = 22
 
+    # Background
     rounded(
         draw,
         (
@@ -360,6 +435,7 @@ def draw_xp_card(
         fill=XP_BACKGROUND,
     )
 
+    # Ratio
     if max_xp > 0:
         ratio = max(
             0,
@@ -375,6 +451,7 @@ def draw_xp_card(
         bar_width * ratio
     )
 
+    # Green XP
     if fill_width > 0:
         rounded(
             draw,
@@ -394,45 +471,77 @@ def draw_xp_card(
 # ============================================================
 
 def draw_gem(
+    img,
     draw,
     center_x,
     center_y,
     size=20,
 ):
-    points = [
-        (
-            center_x,
-            center_y - size,
-        ),
-        (
-            center_x + size,
-            center_y,
-        ),
-        (
-            center_x,
-            center_y + size,
-        ),
-        (
-            center_x - size,
-            center_y,
-        ),
-    ]
+    global gem_icon
 
-    draw.polygon(
-        points,
-        fill=GEM,
-    )
+    _load_icons()
 
-    draw.line(
-        (
-            center_x,
-            center_y - size + 3,
-            center_x,
-            center_y + size - 3,
-        ),
-        fill=(220, 245, 250, 255),
-        width=2,
-    )
+    if gem_icon is not None:
+        icon_size = size * 2
+
+        icon = gem_icon.resize(
+            (
+                icon_size,
+                icon_size,
+            ),
+            Image.Resampling.LANCZOS,
+        )
+
+        img.paste(
+            icon,
+            (
+                center_x - size,
+                center_y - size,
+            ),
+            icon,
+        )
+
+    else:
+        # Fallback
+        points = [
+            (
+                center_x,
+                center_y - size,
+            ),
+            (
+                center_x + size,
+                center_y,
+            ),
+            (
+                center_x,
+                center_y + size,
+            ),
+            (
+                center_x - size,
+                center_y,
+            ),
+        ]
+
+        draw.polygon(
+            points,
+            fill=GEM,
+        )
+
+        draw.line(
+            (
+                center_x,
+                center_y - size + 3,
+                center_x,
+                center_y + size - 3,
+            ),
+            fill=(
+                220,
+                245,
+                250,
+                255,
+            ),
+            width=2,
+        )
 
 
 # ============================================================
@@ -440,38 +549,68 @@ def draw_gem(
 # ============================================================
 
 def draw_mora(
+    img,
     draw,
     center_x,
     center_y,
     size=20,
 ):
-    draw.ellipse(
-        (
-            center_x - size,
-            center_y - size,
-            center_x + size,
-            center_y + size,
-        ),
-        fill=MORA,
-        outline=(240, 215, 145, 255),
-        width=2,
-    )
+    global mora_icon
 
-    draw_center(
-        draw,
-        (
-            center_x - size,
-            center_y - size,
-            center_x + size,
-            center_y + size,
-        ),
-        "M",
-        get_font(
-            15,
-            True,
-        ),
-        (80, 55, 15, 255),
-    )
+    _load_icons()
+
+    if mora_icon is not None:
+        icon_size = size * 2
+
+        icon = mora_icon.resize(
+            (
+                icon_size,
+                icon_size,
+            ),
+            Image.Resampling.LANCZOS,
+        )
+
+        img.paste(
+            icon,
+            (
+                center_x - size,
+                center_y - size,
+            ),
+            icon,
+        )
+
+    else:
+        # Fallback
+        draw.ellipse(
+            (
+                center_x - size,
+                center_y - size,
+                center_x + size,
+                center_y + size,
+            ),
+            fill=MORA,
+        )
+
+        draw_center(
+            draw,
+            (
+                center_x - size,
+                center_y - size,
+                center_x + size,
+                center_y + size,
+            ),
+            "M",
+            get_font(
+                15,
+                True,
+            ),
+            (
+                80,
+                55,
+                15,
+                255,
+            ),
+        )
 
 
 # ============================================================
@@ -479,6 +618,7 @@ def draw_mora(
 # ============================================================
 
 def draw_resource_card(
+    img,
     draw,
     y,
     title,
@@ -487,7 +627,12 @@ def draw_resource_card(
 ):
     x1 = 20
     x2 = WIDTH - 20
+
     height = 100
+
+    # ========================================================
+    # CARD
+    # ========================================================
 
     rounded(
         draw,
@@ -518,22 +663,34 @@ def draw_resource_card(
             x1 + 80,
             center_y + 30,
         ),
-        fill=(43, 43, 43, 255),
+        fill=(
+            43,
+            43,
+            43,
+            255,
+        ),
     )
+
+    # ========================================================
+    # ICON
+    # ========================================================
 
     if icon_type == "gem":
         draw_gem(
+            img,
             draw,
             x1 + 50,
             center_y,
-            18,
+            31,
         )
+
     else:
         draw_mora(
+            img,
             draw,
             x1 + 50,
             center_y,
-            18,
+            31,
         )
 
     # ========================================================
@@ -558,7 +715,9 @@ def draw_resource_card(
     # VALUE
     # ========================================================
 
-    value_text = f"{value:,}"
+    value_text = (
+        f"{value:,}"
+    )
 
     value_font = get_font(
         34,
@@ -589,14 +748,18 @@ async def create_bag(
     points_per_level: int = 100,
 ):
     """
-    Pillow chỉ render:
+    Pillow render:
 
     1. XP
     2. Nguyên thạch
     3. Mora
 
-    Background hoàn toàn transparent.
+    Background bên ngoài hoàn toàn transparent.
     """
+
+    # ========================================================
+    # TRANSPARENT IMAGE
+    # ========================================================
 
     img = Image.new(
         "RGBA",
@@ -607,7 +770,9 @@ async def create_bag(
         TRANSPARENT,
     )
 
-    draw = ImageDraw.Draw(img)
+    draw = ImageDraw.Draw(
+        img
+    )
 
     # ========================================================
     # XP
@@ -630,6 +795,7 @@ async def create_bag(
     # ========================================================
 
     draw_resource_card(
+        img,
         draw,
         y=125,
         title="NGUYÊN THẠCH",
@@ -642,6 +808,7 @@ async def create_bag(
     # ========================================================
 
     draw_resource_card(
+        img,
         draw,
         y=240,
         title="MORA",
