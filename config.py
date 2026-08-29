@@ -49,7 +49,7 @@ PROACTIVE_KEYWORDS = [
 
 MEMBER_KEYWORDS = ["member"]
 
-POLL_KEYWORDS = ["poll"]
+POLL_KEYWORDS = ["vote"]
 
 REMIND_KEYWORDS = ["remind"]
 

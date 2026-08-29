@@ -168,7 +168,7 @@ async def on_message(message):
             await handle_menu(message, bot)
             return
 
-        if t0 == "poll":
+        if t0 == "vote":
             await handle_poll(message, bot)
             return
 

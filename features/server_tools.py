@@ -27,7 +27,7 @@ MENU_PAGES = [
     (
         "🛠️ Công cụ Server",
         [
-            ("📊 Vote", "`chica poll Câu hỏi? | chọn 1 | chọn 2`"),
+            ("📊 Vote", "`chica vote Câu hỏi? | chọn 1 | chọn 2`"),
             ("⏰ Nhắc", "`chica remind 7h học bài`"),
             ("📅 Điểm danh", "`chica daily` (mỗi ngày +10💠 +500🪙)"),
             ("📅 Sự kiện", "`chica make event Tên | thời gian | mô tả | địa điểm`"),
@@ -189,7 +189,7 @@ async def handle_poll(message, bot) -> bool:
     raw = message.content
     # Bỏ tiền tố "chị cá/chica" và từ khóa "poll/vote/bầu/bỏ phiếu"
     raw = re.sub(r"(?i)^(chị\s*cá|chica)\s*", "", raw).strip()
-    raw = re.sub(r"(?i)^(poll|vote|bầu|bỏ\s*phiếu)\s*", "", raw).strip()
+    raw = re.sub(r"(?i)^(vote|poll|bầu|bỏ\s*phiếu)\s*", "", raw).strip()
     # Tách thành: câu hỏi + các lựa chọn
     segments = [s.strip() for s in re.split(r"\||;", raw) if s.strip()]
 
@@ -197,7 +197,7 @@ async def handle_poll(message, bot) -> bool:
     if len(segments) < 3:
         await message.channel.send(
             "Em viết chưa đúng format rồi. "
-            "Gõ: `vote Câu hỏi? | chọn 1 | chọn 2` (phân tách bằng `|`) 🐟",
+            "Gõ: `chica vote Câu hỏi? | chọn 1 | chọn 2` (phân tách bằng `|`) 🐟",
             reference=message, mention_author=False,
         )
         return True
