@@ -19,30 +19,32 @@ MENU_PAGES = [
         "💬 Trò chuyện & Thông tin",
         [
             ("💬 Nói chuyện", "Gọi `chị cá` hoặc tag chị"),
-            ("🔍 Tìm web", "`chị cá` + \"tìm\", \"là ai\", \"khi nào\"..."),
-            ("👥 Thành viên online", "`chị cá` + \"ai đang online\""),
-            ("🔎 Tóm tắt", "`chị cá` + `tóm tắt 1 tiếng` / `tóm tắt 30 tin`"),
+            ("🔍 Tìm web", "`chica search <câu hỏi>`"),
+            ("👥 Thành viên online", "`chica member`"),
+            ("🔎 Tóm tắt", "`chica summary 1 tiếng` / `chica summary 30 tin`"),
         ],
     ),
     (
         "🛠️ Công cụ Server",
         [
-            ("📊 Vote", "`chị cá` + `vote Câu hỏi? | chọn 1 | chọn 2`"),
-            ("⏰ Nhắc", "`chị cá` + `nhắc em 7h học bài`"),
-            ("📅 Điểm danh", "`chị cá` + `daily` (mỗi ngày +10💠 +500🪙)"),
-            ("📅 Sự kiện", "`chị cá tạo sự kiện` + `Tên | thời gian | mô tả | địa điểm`"),
-            ("🔗 Lời mời", "`chị cá` + `tạo link mời`"),
+            ("📊 Vote", "`chica poll Câu hỏi? | chọn 1 | chọn 2`"),
+            ("⏰ Nhắc", "`chica remind 7h học bài`"),
+            ("📅 Điểm danh", "`chica daily` (mỗi ngày +10💠 +500🪙)"),
+            ("📅 Sự kiện", "`chica make event Tên | thời gian | mô tả | địa điểm`"),
+            ("🔗 Lời mời", "`chica link`"),
         ],
     ),
     (
         "🎮 Trò chơi & Điểm",
         [
-            ("💠 Tài sản", "`chị cá` + `tài sản` (xem nguyên thạch / mora / cấp)"),
-            ("🎴 Gacha", "`chị cá` + `gacha` / `gacha 1` / `gacha 5` (50❖ / 250❖)"),
-            ("🗃️ Kho thẻ", "`chị cá` + `kho` (xem các thẻ đã có)"),
-            ("⚔️ PvP", "`chị cá` + `pvp @người_chơi` (3v3 turn-based, ELO)"),
-            ("🏆 Xếp hạng PvP", "`chị cá` + `pvp điểm` / `pvp top`"),
-            ("ℹ️ Thông tin thẻ", "`chị cá` + `skill + tên` (vd: `chị cá skill skirk` — xem thẻ đã sở hữu)"),
+            ("💠 Tài sản", "`chica bag` (xem nguyên thạch / mora / cấp)"),
+            ("🎴 Gacha", "`chica gacha` / `chica gacha 1` / `chica gacha 5` (50❖ / 250❖)"),
+            ("🗃️ Kho thẻ", "`chica inventory` (xem các thẻ đã có)"),
+            ("⚔️ PvP", "`chica pvp @người_chơi` (3v3 turn-based, ELO)"),
+            ("🏆 Xếp hạng PvP", "`chica pvp point` / `chica pvp top`"),
+            ("ℹ️ Thông tin thẻ", "`chica info + tên` (vd: `chica info skirk` — xem thẻ đã sở hữu)"),
+            ("🖼️ Ảnh nhân vật", "`chica show + tên` (vd: `chica show kazuha` — hiện GIF/ảnh)"),
+            ("🎧 Kênh thoại", "`chica voice in` / `chica voice out`"),
         ],
     ),
 ]
@@ -55,7 +57,7 @@ def _menu_text(page=0):
     for name, val in items:
         lines.append(f"**{name}** — {val}")
     lines.append("")
-    lines.append(f"_Trang {page + 1}/{len(MENU_PAGES)} • Gõ \"chị cá menu\" để xem lại!_")
+    lines.append(f"_Trang {page + 1}/{len(MENU_PAGES)} • Gõ \"chica menu\" để xem lại!_")
     return "\n".join(lines)
 
 

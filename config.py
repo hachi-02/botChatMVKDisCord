@@ -15,15 +15,12 @@ MAX_HISTORY = 10
 
 KEYWORDS = [
     "chị cá",
-    "chica",
     "chicá",
     "chị ca",
     "cá ơi",
     "ca ơi",
     "ê chị cá",
-    "ê chica",
     "chị cá ơi",
-    "chica ơi",
 ]
 
 CHUI_KEYWORDS = ["chửi"]
@@ -50,21 +47,18 @@ PROACTIVE_KEYWORDS = [
     "tinder", "love", "crush", "tình yêu",
 ]
 
-MEMBER_KEYWORDS = [
-    "danh sách thành viên", "ai trong group", "có ai", "thành viên",
-    "list member", "ai đang online", "bao nhiêu người", "ai đang ở đây",
-]
+MEMBER_KEYWORDS = ["member"]
 
-POLL_KEYWORDS = ["poll", "vote", "bầu", "bỏ phiếu"]
+POLL_KEYWORDS = ["poll"]
 
-REMIND_KEYWORDS = ["nhắc t", "remind", "nhắc tôi", "nhắc em"]
+REMIND_KEYWORDS = ["remind"]
 
-EVENT_KEYWORDS = ["tạo sự kiện", "tạo event", "lên lịch", "event", "schedule"]
-INVITE_KEYWORDS = ["lời mời", "link mời"]
-SUMMARY_KEYWORDS = ["tóm tắt"]
+EVENT_KEYWORDS = ["make event", "event"]
+INVITE_KEYWORDS = ["link"]
+SUMMARY_KEYWORDS = ["summary"]
 SUMMARY_LIMIT = 50
 SUMMARY_MAX = 500
-HELP_KEYWORDS = ["menu", "help"]
+HELP_KEYWORDS = ["menu"]
 EVENT_HELP_KEYWORDS = [
     "như nào", "cách", "hướng dẫn", "làm sao", "như thế nào",
     "dùng sao", "guide", "how to", "how","chỉ"
@@ -81,7 +75,7 @@ EMOJI_MAP = {
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 
-ASSET_KEYWORDS = ["tài sản", "tai san", "assets", "nguyên thạch", "mora"]
+ASSET_KEYWORDS = ["bag"]
 DAILY_KEYWORDS = ["daily"]
 DAILY_GEMS = 10
 DAILY_MORA = 500
@@ -91,15 +85,16 @@ GEM_PER_MSG = 10
 MORA_PER_MSG = 500
 POINTS_PER_LEVEL = 200
 
-GACHA_KEYWORDS = ["gacha", "quay", "roll"]
-COLLECTION_KEYWORDS = ["sở hữu", "collection", "kho", "bộ sưu tập"]
-SHOW_KEYWORDS = ["show", "xem ảnh", "ảnh"]
+GACHA_KEYWORDS = ["gacha"]
+COLLECTION_KEYWORDS = ["inventory"]
+SHOW_KEYWORDS = ["show"]
+INFO_KEYWORDS = ["info"]
 
-VOICE_IN_KEYWORDS = ["voicein", "giữ voice", "vào voice"]
-VOICE_OUT_KEYWORDS = ["voiceout", "rời voice", "out voice"]
+VOICE_IN_KEYWORDS = ["voice in", "voicein"]
+VOICE_OUT_KEYWORDS = ["voice out", "voiceout"]
 
-PVP_KEYWORDS = ["pvp", "pk", "thách đấu"]
-PVP_RANK_KEYWORDS = ["điểm", "top"]
+PVP_KEYWORDS = ["pvp"]
+PVP_RANK_KEYWORDS = ["point", "top"]
 PVP_TEAM_SIZE = 3
 PVP_MAX_ROUND = 30
 PVP_K = 32

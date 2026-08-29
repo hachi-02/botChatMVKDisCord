@@ -29,7 +29,7 @@ def _event_help_embed(bot):
         e.set_author(name="Chị Cá 🐟", icon_url=bot.user.display_avatar.url)
     e.add_field(
         name="Cú pháp",
-        value="`chị cá tạo sự kiện Tên | thời gian | mô tả | địa điểm`",
+        value="`chica make event Tên | thời gian | mô tả | địa điểm`",
         inline=False,
     )
     e.add_field(name="Bắt buộc", value="**Tên** và **thời gian**", inline=True)
@@ -42,8 +42,8 @@ def _event_help_embed(bot):
     )
     e.add_field(
         name="Ví dụ",
-        value="• `chị cá tạo sự kiện Sinh nhật | ngày mai 20h | mang bánh | voice chung`\n"
-              "• `chị cá event Offline | 25/12 19h30` 🐟",
+        value="• `chica make event Sinh nhật | ngày mai 20h | mang bánh | voice chung`\n"
+              "• `chica event Offline | 25/12 19h30` 🐟",
         inline=False,
     )
     return e
@@ -219,11 +219,11 @@ async def handle_remind(message, bot) -> bool:
         await message.channel.send(
             "Chị chưa hiểu thời gian em muốn nhắc!\n"
             "**📌 Ví dụ cách dùng:**\n"
-            "• `nhắc em 30 phút học bài`->`30 phút đếm ngược`\n"
-            "• `nhắc em 1 tiếng học bài`->`1 tiếng đếm ngược`\n"
-            "• `nhắc em 7h học bài`->`7:00 giờ cố định`\n"
-            "• `nhắc em ngày mai 8h30 dậy`\n"
-            "• `nhắc em 25/12 đi chợ`\n\n"
+            "• `chica remind 30 phút học bài`->`30 phút đếm ngược`\n"
+            "• `chica remind 1 tiếng học bài`->`1 tiếng đếm ngược`\n"
+            "• `chica remind 7h học bài`->`7:00 giờ cố định`\n"
+            "• `chica remind ngày mai 8h30 dậy`\n"
+            "• `chica remind 25/12 đi chợ`\n\n"
             "💡Chỉ cần nói thời gian + việc cần nhắc là được!",
             reference=message, mention_author=False,
         )
@@ -284,7 +284,9 @@ async def handle_event_creation(message, bot) -> bool:
         raw,
     ).strip()
     raw = re.sub(
-        r"(?i)^(tạo sự kiện|tạo event|lên lịch|event|schedule)\s*", "", raw
+        r"(?i)^(make\s*event|tạo\s*sự\s*kiện|tạo\s*event|lên\s*lịch|event|schedule)\s*",
+        "",
+        raw,
     ).strip()
 
     if bot.user:

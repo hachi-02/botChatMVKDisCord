@@ -8,21 +8,6 @@ import discord
 from config import (
     ROLE_ID,
     KEYWORDS,
-    HELP_KEYWORDS,
-    EVENT_KEYWORDS,
-    INVITE_KEYWORDS,
-    MEMBER_KEYWORDS,
-    POLL_KEYWORDS,
-    REMIND_KEYWORDS,
-    SUMMARY_KEYWORDS,
-    ASSET_KEYWORDS,
-    DAILY_KEYWORDS,
-    GACHA_KEYWORDS,
-    COLLECTION_KEYWORDS,
-    SHOW_KEYWORDS,
-    VOICE_IN_KEYWORDS,
-    VOICE_OUT_KEYWORDS,
-    PVP_KEYWORDS,
     PVP_RANK_KEYWORDS,
 )
 from game.pvp.ui import start_pvp_challenge, handle_pvp_rank, handle_card_info, handle_show_card, is_in_pvp
@@ -109,118 +94,102 @@ async def on_message(message):
         or any(kw in content_lower for kw in KEYWORDS)
     )
 
-    is_general_help = addressed and any(
-        kw in content_lower for kw in HELP_KEYWORDS
-    )
-    if is_general_help:
-        await handle_menu(message, bot)
-        return
+    # ---- Dispatch lệnh: `chica <lenh>` (thứ tự cứng, chica ở đầu) ----
+    cmd_match = re.match(r"^\s*chica\b\s*(.*)$", content_lower)
+    if cmd_match:
+        cmd = cmd_match.group(1).strip()
+        cmdl = cmd.lower()
+        tokens = cmd.split()
+        t0 = tokens[0].lower() if tokens else ""
 
-    is_event = addressed and any(kw in content_lower for kw in EVENT_KEYWORDS)
-    if is_event:
-        handled = await handle_event_creation(message, bot)
-        if handled:
-            return
-
-    is_invite = addressed and any(kw in content_lower for kw in INVITE_KEYWORDS)
-    if is_invite:
-        await handle_invite(message, bot)
-        return
-
-    if addressed:
-        is_member_list = any(kw in content_lower for kw in MEMBER_KEYWORDS)
-        if is_member_list and message.guild:
+        if t0 == "member":
             await handle_member_list(message, bot)
             return
 
-        is_poll = any(kw in content_lower for kw in POLL_KEYWORDS)
-        if is_poll:
-            await handle_poll(message, bot)
+        if t0 == "search":
+            await handle_chat(message, bot)
             return
 
-        is_remind = any(kw in content_lower for kw in REMIND_KEYWORDS)
-        if is_remind:
+        if t0 == "summary":
+            await handle_summary(message, bot)
+            return
+
+        if t0 == "remind":
             await handle_remind(message, bot)
             return
 
-    is_summary = addressed and any(kw in content_lower for kw in SUMMARY_KEYWORDS)
-    if is_summary:
-        await handle_summary(message, bot)
-        return
-
-    is_gacha = addressed and any(kw in content_lower for kw in GACHA_KEYWORDS)
-    if is_gacha:
-        if is_in_pvp(message.author.id):
-            await message.channel.send(
-                "Em đang trong trận PvP, xong trận mới quay gacha được nhé 🐟",
-                reference=message, mention_author=False,
-            )
+        if t0 == "make" or t0 == "event":
+            await handle_event_creation(message, bot)
             return
-        cl = message.content.lower()
-        if "5" in cl:
-            n = 5
-        elif "1" in cl:
-            n = 1
-        else:
-            n = None
-        if n:
-            await handle_gacha(message.channel, message.author, bot, n)
-        else:
-            pts = await get_gems(message.author.id)
-            view = GachaView(bot, message.author, pts)
-            g_msg = await message.channel.send(view=view)
-            view.message = g_msg
-        return
 
-    is_collection = addressed and any(kw in content_lower for kw in COLLECTION_KEYWORDS)
-    if is_collection:
-        await handle_collection(message.channel, message.author, bot)
-        return
+        if t0 == "link":
+            await handle_invite(message, bot)
+            return
 
-    is_pvp = addressed and any(kw in content_lower for kw in PVP_KEYWORDS)
-    if is_pvp:
-        cl = message.content.lower()
-        if any(k in cl for k in PVP_RANK_KEYWORDS):
-            await handle_pvp_rank(message, bot)
-        else:
-            await start_pvp_challenge(message, bot)
-        return
+        if t0 == "bag":
+            await handle_assets(message, bot)
+            return
 
-    is_daily = addressed and any(kw in content_lower for kw in DAILY_KEYWORDS)
-    if is_daily:
-        await handle_daily(message, bot)
-        return
+        if t0 == "inventory":
+            await handle_collection(message.channel, message.author, bot)
+            return
 
-    is_asset = addressed and any(kw in content_lower for kw in ASSET_KEYWORDS)
-    if is_asset:
-        await handle_assets(message, bot)
-        return
+        if t0 == "gacha":
+            if is_in_pvp(message.author.id):
+                await message.channel.send(
+                    "Em đang trong trận PvP, xong trận mới quay gacha được nhé 🐟",
+                    reference=message, mention_author=False,
+                )
+                return
+            if "5" in cmdl:
+                n = 5
+            elif "1" in cmdl:
+                n = 1
+            else:
+                n = None
+            if n:
+                await handle_gacha(message.channel, message.author, bot, n)
+            else:
+                pts = await get_gems(message.author.id)
+                view = GachaView(bot, message.author, pts)
+                g_msg = await message.channel.send(view=view)
+                view.message = g_msg
+            return
 
-    is_card_info = (
-        addressed and "skill" in content_lower and (card := find_card(content_lower)) is not None
-    )
-    if is_card_info:
-        await handle_card_info(message.channel, message.author, card)
-        return
+        if t0 == "show" and (card := find_card(cmd)) is not None:
+            await handle_show_card(message.channel, card)
+            return
 
-    is_show = (
-        addressed
-        and any(kw in content_lower for kw in SHOW_KEYWORDS)
-        and (card := find_card(content_lower)) is not None
-    )
-    if is_show and card is not None:
-        await handle_show_card(message.channel, card)
-        return
+        if t0 == "info" and (card := find_card(cmd)) is not None:
+            await handle_card_info(message.channel, message.author, card)
+            return
 
-    is_voice_out = addressed and any(kw in content_lower for kw in VOICE_OUT_KEYWORDS)
-    if is_voice_out:
-        await handle_voice_leave(message, bot)
-        return
+        if t0 == "menu":
+            await handle_menu(message, bot)
+            return
 
-    is_voice_in = addressed and any(kw in content_lower for kw in VOICE_IN_KEYWORDS)
-    if is_voice_in:
-        await handle_voice_join(message, bot)
-        return
+        if t0 == "poll":
+            await handle_poll(message, bot)
+            return
+
+        if t0 == "daily":
+            await handle_daily(message, bot)
+            return
+
+        if t0 == "pvp":
+            if any(k in cmdl for k in PVP_RANK_KEYWORDS):
+                await handle_pvp_rank(message, bot)
+            else:
+                await start_pvp_challenge(message, bot)
+            return
+
+        if cmdl.startswith("voice in") or cmdl == "voicein":
+            await handle_voice_join(message, bot)
+            return
+
+        if cmdl.startswith("voice out") or cmdl == "voiceout":
+            await handle_voice_leave(message, bot)
+            return
 
     if await handle_chat(message, bot):
         return

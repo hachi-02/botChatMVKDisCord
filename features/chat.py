@@ -55,8 +55,8 @@ SUMMARY_SYSTEM_PROMPT = (
 # Lấy lịch sử kênh theo thời gian hoặc số tin, đưa cho AI tóm gọn.
 # Trả về True sau khi xử lý xong (luôn tuân theo route trong bot.py).
 async def handle_summary(message, bot) -> bool:
-    raw = re.sub(r"^(chị\s*cá|chica)\s*", "", message.content, flags=re.I).strip()
-    raw = raw.replace("tóm tắt", "", 1).strip()   # Bỏ từ "tóm tắt" để lấy phần tham số
+    raw = re.sub(r"^(chicha|chica)\s*", "", message.content, flags=re.I).strip()
+    raw = re.sub(r"^(summary|t\u00f3m t\u1eaft)\s*", "", raw, flags=re.I).strip()
 
     now = datetime.now(ZoneInfo("Asia/Ho_Chi_Minh"))
     after = None     # Mốc thời gian lấy từ đây trở đi (nếu tóm tắt theo khoảng giờ)
@@ -204,6 +204,9 @@ async def handle_chat(message, bot) -> bool:
         prompt = prompt.replace(role.mention, "")
 
     prompt = prompt.strip()
+
+    # Bỏ tiền tố lệnh `chica search` để chỉ gửi nội dung tìm kiếm thật cho AI
+    prompt = re.sub(r"(?i)^\s*(chica)\s*search\s*", "", prompt).strip()
 
     sender_name = message.author.display_name or message.author.name
 
