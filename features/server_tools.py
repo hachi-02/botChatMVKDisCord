@@ -55,9 +55,10 @@ MENU_PAGES = [
 # Tạo nội dung text của menu trang `page` (nằm trong TextDisplay của Container).
 def _menu_text(page=0):
     title, items = MENU_PAGES[page]
-    lines = [f"# 🐟 Menu Chị Cá", "", f"## {title}", ""]
+    lines = [f"# MENU CHỊ CÁ", "", f"## {title}", ""]
     for name, val in items:
         lines.append(f"**{name}** — {val}")
+        lines.append("")
     lines.append("")
     lines.append(f"_Trang {page + 1}/{len(MENU_PAGES)} • Gõ \"chica menu\" để xem lại!_")
     return "\n".join(lines)
