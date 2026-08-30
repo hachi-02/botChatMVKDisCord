@@ -150,45 +150,51 @@ async def on_message(message):
     # ==========================================
     jail_info = await get_jail_state(message.author.id)
     if jail_info:
-        # Nếu đang ở trong tù, chặn tất cả tin nhắn ngoài kênh phong-chep-phat
-        if message.channel.name != "phong-chep-phat":
+        # Kiểm tra xem có đang gửi trong kênh phong-chep-phat hoặc Thread con của kênh này không
+        is_in_jail_channel = (message.channel.name == "phong-chep-phat") or (
+            isinstance(message.channel, discord.Thread) and message.channel.parent and message.channel.parent.name == "phong-chep-phat"
+        )
+
+        if not is_in_jail_channel:
             try:
                 await message.delete()
             except Exception:
                 pass
             return
 
-        # Đang ở trong kênh chép phạt
         current_sentence = jail_info.get("current_sentence")
 
-        # Trường hợp chưa có câu chép phạt hiện tại -> Giao câu mới
+        # Trường hợp chưa có câu chép phạt -> Giao câu mới
         if not current_sentence:
             new_sentence = random.choice(JAIL_SENTENCES)
             await set_jail_sentence(message.author.id, new_sentence)
             await message.channel.send(
                 f"⛓️ **TÙ NHÂN {message.author.mention}** [{jail_info['done_count']}/{jail_info['target_count']}]\n"
                 f"Hãy chép lại chính xác câu sau đây để giảm án:\n"
-                f"```\n{new_sentence}\n```",
-                reference=message, mention_author=False
+                f"```\n{new_sentence}\n```"
             )
             return
 
         # Trường hợp đã có câu chép phạt -> Kiểm tra nội dung chép
         if message.content.strip() == current_sentence.strip():
-            # Chép đúng
             updated = await increment_jail_done(message.author.id)
             if updated and updated["done_count"] >= updated["target_count"]:
-                # 1. Gửi thông báo chúc mừng trước để tù nhân kịp đọc tại kênh
+                # 1. Thông báo chúc mừng trước
                 await message.channel.send(
                     f"🎉 **ĐÃ HOÀN THÀNH MÃ HẠN TÙ!**\n"
-                    f"Chúc mừng {message.author.mention} đã chép phạt xong **{updated['target_count']}** câu và được khôi phục quyền công dân! Hãy giữ mình nhé 🐟",
-                    reference=message, mention_author=False
+                    f"Chúc mừng {message.author.mention} đã chép phạt xong **{updated['target_count']}** câu và được khôi phục quyền công dân! Hãy giữ mình nhé 🐟"
                 )
                 
-                # Chờ 2 giây để client Discord đồng bộ tin nhắn
-                await asyncio.sleep(2)
+                await asyncio.sleep(3)
 
-                # 2. Xóa khỏi DB và gỡ Role Tù nhân
+                # 2. Xóa Thread riêng của tù nhân (nếu tin nhắn ở trong Thread)
+                if isinstance(message.channel, discord.Thread):
+                    try:
+                        await message.channel.delete()
+                    except Exception:
+                        pass
+
+                # 3. Xóa khỏi DB & Tháo Role tù nhân
                 await unjail_user(message.author.id)
                 jail_role = discord.utils.get(message.guild.roles, name="Tù Nhân - Chép Phạt")
                 if jail_role and jail_role in message.author.roles:
@@ -197,7 +203,7 @@ async def on_message(message):
                     except Exception:
                         pass
                 
-                # 3. Khôi phục các role cũ
+                # 4. Khôi phục các role cũ
                 roles_to_add = [
                     message.guild.get_role(rid) 
                     for rid in updated["original_roles"] 
@@ -214,14 +220,12 @@ async def on_message(message):
                 await set_jail_sentence(message.author.id, next_sentence)
                 await message.channel.send(
                     f"✅ **Đúng!** Tiến độ: [{updated['done_count']}/{updated['target_count']}]\n"
-                    f"Câu tiếp theo của em:\n```\n{next_sentence}\n```",
-                    reference=message, mention_author=False
+                    f"Câu tiếp theo của em:\n```\n{next_sentence}\n```"
                 )
         else:
             # Chép sai
             await message.channel.send(
-                f"❌ Chép sai rồi! Hãy chép lại **chính xác từng ký tự**:\n```\n{current_sentence}\n```",
-                reference=message, mention_author=False
+                f"❌ Chép sai rồi! Hãy chép lại **chính xác từng ký tự**:\n```\n{current_sentence}\n```"
             )
         return
 
@@ -272,25 +276,23 @@ async def on_message(message):
                 await message.channel.send("Em không thể nhốt chính em cá nha 🐟", reference=message, mention_author=False)
                 return
 
-            # Lấy số câu chép phạt (mặc định 5 câu nếu không nhập)
             target_count = 5
             for token in tokens[1:]:
                 if token.isdigit():
                     target_count = int(token)
                     break
 
-            # 1. Lưu danh sách role cũ & Khởi tạo dữ liệu tù nhân trong DB
+            # 1. Lưu DB
             original_roles = [r.id for r in target.roles if not r.is_default()]
             await jail_user(target.id, target_count, original_roles)
 
-            # 2. Lấy role Jail & Xử lý kênh chép phạt
+            # 2. Xử lý Kênh & Role
             jail_role = await get_or_create_jail_role(message.guild)
             jail_channel = discord.utils.get(message.guild.text_channels, name="phong-chep-phat")
             
-            # Phân quyền chuẩn cho phòng chép phạt
             jail_overwrites = {
                 message.guild.default_role: discord.PermissionOverwrite(view_channel=False),
-                message.guild.me: discord.PermissionOverwrite(view_channel=True, send_messages=True, read_message_history=True, manage_messages=True)
+                message.guild.me: discord.PermissionOverwrite(view_channel=True, send_messages=True, read_message_history=True, manage_threads=True)
             }
             if jail_role:
                 jail_overwrites[jail_role] = discord.PermissionOverwrite(
@@ -305,15 +307,8 @@ async def on_message(message):
                 except Exception as e:
                     jail_channel = message.channel
             else:
-                # Ép lại quyền chuẩn xác cho kênh nếu kênh đã tồn tại
                 if jail_role:
                     await jail_channel.set_permissions(jail_role, view_channel=True, send_messages=True, read_message_history=True)
-
-            # --- DỌN DẸP TIN NHẮN CŨ (RESET PHÒNG CHÉP PHẠT) ---
-            try:
-                await jail_channel.purge(limit=100)
-            except Exception as e:
-                print(f"Lỗi khi dọn dẹp tin nhắn kênh jail: {e}", flush=True)
 
             # 3. Tháo role cũ & Gán role Jail
             try:
@@ -325,20 +320,32 @@ async def on_message(message):
             except Exception as e:
                 print(f"Lỗi khi tháo/gán role jail: {e}", flush=True)
 
-            # 4. Giao câu chép phạt đầu tiên ngay lập tức vào phòng đã dọn sạch
+            # 4. Tạo THREAD RIÊNG biệt cho từng tù nhân
+            thread_name = f"🔒-phong-phat-{target.name}"
+            try:
+                jail_thread = await jail_channel.create_thread(
+                    name=thread_name,
+                    type=discord.ChannelType.private_thread if message.guild.premium_tier >= 2 else discord.ChannelType.public_thread
+                )
+                await jail_thread.add_user(target)
+            except Exception as e:
+                print(f"Lỗi tạo thread jail: {e}", flush=True)
+                jail_thread = jail_channel
+
+            # 5. Giao câu chép phạt đầu tiên trong Thread riêng
             first_sentence = random.choice(JAIL_SENTENCES)
             await set_jail_sentence(target.id, first_sentence)
             
-            await jail_channel.send(
+            await jail_thread.send(
                 f"⛓️ **TÙ NHÂN {target.mention}** [0/{target_count}]\n"
-                f"Chào mừng em đến với nhà tù công ích! Hãy chép lại **chính xác từng ký tự** câu sau đây để giảm án:\n"
+                f"Chào mừng em đến với phòng phạt riêng! Hãy chép lại **chính xác từng ký tự** câu sau đây để giảm án:\n"
                 f"```\n{first_sentence}\n```"
             )
 
             # Thông báo cho Admin ở kênh vừa gõ lệnh
             await message.channel.send(
                 f"🚨 {target.mention} đã bị nhốt vào nhà tù công ích với **{target_count} câu chép phạt**!\n"
-                f"Hãy di chuyển đến kênh {jail_channel.mention} để thực hiện nghĩa vụ.",
+                f"Phòng phạt riêng: {jail_thread.mention}",
                 reference=message, mention_author=False
             )
             return
@@ -352,7 +359,6 @@ async def on_message(message):
                 )
                 return
 
-            # Hỗ trợ lấy target qua Mention hoặc qua User ID
             target = None
             if message.mentions:
                 target = message.mentions[0]
@@ -559,14 +565,12 @@ async def on_message(message):
             if message.author.id in pending_kicks:
                 data = pending_kicks.pop(message.author.id)
                 elapsed = time.time() - data["timestamp"]
-                # Kiểm tra timeout 30s
                 if elapsed > 30:
                     await message.channel.send(
                         "⏰ Thời gian chờ hết 30s, lệnh kick đã tự hủy 🐟",
                         reference=message, mention_author=False,
                     )
                     return
-                # Thực hiện kick
                 target = discord.utils.get(message.guild.members, id=data["target_id"])
                 if target:
                     try:
