@@ -225,7 +225,7 @@ async def on_message(message):
             target = message.mentions[0]
             author = message.author
 
-            # --- MỚI: Không tự kick bot chính ---
+            # Không tự kick bot chính
             if target == bot.user:
                 await message.channel.send(
                     "Em không thể kick chính em cá nha 🐟",
@@ -244,7 +244,7 @@ async def on_message(message):
             # Kiểm tra role hierarchy: author phải có role cao hơn target
             if target.top_role.position >= author.top_role.position:
                 await message.channel.send(
-                    f"Em không có quyền kick {target.mention} vì role của em thấp hơn hoặc bằng của em 🐟",
+                    f"Em không có quyền kick {target.mention} vì role của em thấp hơn hoặc bằng 🐟",
                     reference=message, mention_author=False,
                 )
                 return
@@ -263,64 +263,64 @@ async def on_message(message):
                 "timestamp": time.time(),
             }
             await message.channel.send(
-                f"🔔 {author.mention}, em có muốn kic {target.mention} không?\n"
+                f"🔔 {author.mention}, em có muốn kick {target.mention} không?\n"
                 f"Gõ `chica yes` để xác nhận hoặc `chica no` để hủy (hết 30s tự hủy).",
                 reference=message, mention_author=False,
             )
             return
 
-    if t0 == "yes":
-        # Xử lý xác nhận kick
-        if message.author.id in pending_kicks:
-            data = pending_kicks.pop(message.author.id)
-            elapsed = time.time() - data["timestamp"]
-            # Kiểm tra timeout 30s
-            if elapsed > 30:
-                await message.channel.send(
-                    "⏰ Thời gian chờ hết 30s, lệnh kick đã tự hủy 🐟",
-                    reference=message, mention_author=False,
-                )
-                return
-            # Thực hiện kick
-            target = discord.utils.get(message.guild.members, id=data["target_id"])
-            if target:
-                try:
-                    await target.kick(reason=f"Kick bởi {message.author.name} (xác nhận via chica yes)")
+        if t0 == "yes":
+            # Xử lý xác nhận kick
+            if message.author.id in pending_kicks:
+                data = pending_kicks.pop(message.author.id)
+                elapsed = time.time() - data["timestamp"]
+                # Kiểm tra timeout 30s
+                if elapsed > 30:
                     await message.channel.send(
-                        f"✅ {target.mention} đã được kick khỏi server!",
+                        "⏰ Thời gian chờ hết 30s, lệnh kick đã tự hủy 🐟",
                         reference=message, mention_author=False,
                     )
-                except Exception as e:
+                    return
+                # Thực hiện kick
+                target = discord.utils.get(message.guild.members, id=data["target_id"])
+                if target:
+                    try:
+                        await target.kick(reason=f"Kick bởi {message.author.name} (xác nhận via chica yes)")
+                        await message.channel.send(
+                            f"✅ {target.mention} đã được kick khỏi server!",
+                            reference=message, mention_author=False,
+                        )
+                    except Exception as e:
+                        await message.channel.send(
+                            f"❌ Không thể kick {target.mention}: {type(e).__name__}: {e}",
+                            reference=message, mention_author=False,
+                        )
+                else:
                     await message.channel.send(
-                        f"❌ Không thể kick {target.mention}: {type(e).__name__}: {e}",
+                        "Không tìm thấy người dùng này trong server 🐟",
                         reference=message, mention_author=False,
                     )
             else:
                 await message.channel.send(
-                    "Không tìm thấy người dùng này trong server 🐟",
+                    "Em chưa có lệnh kick nào đang chờ duyệt nhé 🐟",
                     reference=message, mention_author=False,
                 )
-        else:
-            await message.channel.send(
-                "Em chưa có lệnh kick nào đang chờ duyệt nhé 🐟",
-                reference=message, mention_author=False,
-            )
-        return
+            return
 
-    if t0 == "no":
-        # Hủy lệnh kick
-        if message.author.id in pending_kicks:
-            pending_kicks.pop(message.author.id)
-            await message.channel.send(
-                "🚫 Lệnh kick đã bị hủy nhé 🐟",
-                reference=message, mention_author=False,
-            )
-        else:
-            await message.channel.send(
-                "Em chưa có lệnh kick nào đang chờ duyệt nhé 🐟",
-                reference=message, mention_author=False,
-            )
-        return
+        if t0 == "no":
+            # Hủy lệnh kick
+            if message.author.id in pending_kicks:
+                pending_kicks.pop(message.author.id)
+                await message.channel.send(
+                    "🚫 Lệnh kick đã bị hủy nhé 🐟",
+                    reference=message, mention_author=False,
+                )
+            else:
+                await message.channel.send(
+                    "Em chưa có lệnh kick nào đang chờ duyệt nhé 🐟",
+                    reference=message, mention_author=False,
+                )
+            return
 
     if await handle_chat(message, bot):
         return
