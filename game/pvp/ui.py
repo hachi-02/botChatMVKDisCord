@@ -27,7 +27,9 @@ from db import (
     set_char_level,
     get_mora,
     spend_mora,
+    get_rank,
 )
+from pilow_image.pvp_pilow import create_pvp_card
 from .cards import (
     get_card,
     element_name,
@@ -1252,11 +1254,58 @@ async def handle_pvp_rank(message, bot):
     rating = row["rating"]
     wins = row["wins"]
     losses = row["losses"]
-    e = discord.Embed(title=f"⭐ Hạng PvP của {target.display_name}", color=PVP_COLOR)
-    e.set_author(name="Chị Cá 🐟 PvP")
-    e.set_thumbnail(url=target.display_avatar.url)
-    e.add_field(name="ELO", value=f"**{rating}**", inline=True)
-    e.add_field(name="Thắng", value=f"{wins}", inline=True)
-    e.add_field(name="Thua", value=f"{losses}", inline=True)
+
+    # ========================================================
+    # RANK (thứ hạng PvP trên bảng rating)
+    # ========================================================
+    rank = None
+    try:
+        top_list = await get_pvp_top(1000)
+        for i, r in enumerate(top_list, 1):
+            if r["user_id"] == target.id:
+                rank = i
+                break
+    except Exception as e:
+        print(f"LỖI PVP RANK: {type(e).__name__}: {e}", flush=True)
+
+    # ========================================================
+    # PILLOW (phong cách giống chica bag)
+    # ========================================================
+
+    image = await create_pvp_card(
+        target=target,
+        rating=rating,
+        wins=wins,
+        losses=losses,
+        rank=rank,
+    )
+
+    file = discord.File(
+        image,
+        filename="pvp.png",
+    )
+
+    # ========================================================
+    # EMBED (giống bag: avatar người chơi + ảnh pill + footer)
+    # ========================================================
+
+    e = discord.Embed(
+        title=f"⭐ Hạng PvP của {target.display_name}",
+        color=PVP_COLOR,
+    )
+
+    try:
+        e.set_thumbnail(url=target.display_avatar.url)
+    except Exception:
+        pass
+
+    e.set_image(url="attachment://pvp.png")
+
     e.set_footer(text="Thắng +ELO, thua -ELO (K=32)")
-    await message.channel.send(embed=e, reference=message, mention_author=False)
+
+    await message.channel.send(
+        embed=e,
+        file=file,
+        reference=message,
+        mention_author=False,
+    )

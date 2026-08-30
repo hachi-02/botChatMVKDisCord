@@ -4,6 +4,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from pilow_image.bag_pilow import create_bag
+from pilow_image.levelup_pilow import create_levelup_card
 
 from config import (
     POINT_COOLDOWN,
@@ -137,6 +138,27 @@ async def _award_and_notify(
             xp % POINTS_PER_LEVEL
         )
 
+        # ====================================================
+        # PILLOW (phong cách giống bag / pvp)
+        # ====================================================
+
+        image = await create_levelup_card(
+            author=author,
+            level=new_lvl,
+            xp=xp,
+            prog=prog,
+            points_per_level=POINTS_PER_LEVEL,
+        )
+
+        file = discord.File(
+            image,
+            filename="levelup.png",
+        )
+
+        # ====================================================
+        # EMBED
+        # ====================================================
+
         e = discord.Embed(
             title=(
                 f"🎉 {author.display_name} "
@@ -154,23 +176,13 @@ async def _award_and_notify(
             bot,
         )
 
-        e.add_field(
-            name="Cấp",
-            value=f"**{new_lvl}**",
-            inline=True,
-        )
-
-        e.add_field(
-            name="Tiến độ",
-            value=(
-                f"[{_bar(prog)}] "
-                f"{prog}/{POINTS_PER_LEVEL} XP"
-            ),
-            inline=True,
+        e.set_image(
+            url="attachment://levelup.png"
         )
 
         await channel.send(
-            embed=e
+            embed=e,
+            file=file,
         )
 
 
