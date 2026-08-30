@@ -69,6 +69,17 @@ SCHEMA_STATEMENTS = [
         PRIMARY KEY (guild_id, user_id)
     );
     """,
+    # Bảng Nhà tù công ích (Jail System)
+    """
+    CREATE TABLE IF NOT EXISTS jail_state (
+        user_id BIGINT PRIMARY KEY,
+        target_count INT NOT NULL,
+        done_count INT NOT NULL DEFAULT 0,
+        original_roles TEXT NOT NULL,
+        current_sentence TEXT,
+        jailed_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    """,
     # Migration Schema (Nâng cấp cột an toàn)
     "ALTER TABLE gacha_cards ADD COLUMN IF NOT EXISTS lvl INT NOT NULL DEFAULT 1;",
     "ALTER TABLE points DROP COLUMN IF EXISTS max_level;",
@@ -200,7 +211,6 @@ async def spend_gems(user_id: int, n: int) -> bool:
         return False
     try:
         await _ensure_schema()
-        # Dùng Atomic UPDATE với RETURNING để chống Race Condition
         res = await db_pool.execute(
             "UPDATE points SET points = points - $2 WHERE user_id=$1 AND points >= $2",
             user_id, n
@@ -220,7 +230,6 @@ async def spend_mora(user_id: int, n: int) -> bool:
         return False
     try:
         await _ensure_schema()
-        # Dùng Atomic UPDATE với RETURNING để chống Race Condition
         res = await db_pool.execute(
             "UPDATE points SET mora = mora - $2 WHERE user_id=$1 AND mora >= $2",
             user_id, n
@@ -462,7 +471,6 @@ async def save_xp_snapshot(guild_id: int, xp_map: dict):
         async with db_pool.acquire() as conn:
             async with conn.transaction():
                 await conn.execute("DELETE FROM xp_snapshot WHERE guild_id=$1", guild_id)
-                # Dùng executemany để gửi batch 1 lần duy nhất, tăng tốc độ gấp hàng chục lần
                 await conn.executemany(
                     "INSERT INTO xp_snapshot(guild_id, user_id, xp, at) VALUES($1, $2, $3, now())",
                     args
@@ -494,7 +502,6 @@ async def claim_daily(user_id: int, gems: int, mora: int) -> bool:
         return False
     try:
         await _ensure_schema()
-        # Dùng UPSERT (ON CONFLICT) với điều kiện kiểm tra ngày checkin
         result = await db_pool.fetchval(
             """
             INSERT INTO points(user_id, points, mora, last_checkin)
@@ -508,8 +515,105 @@ async def claim_daily(user_id: int, gems: int, mora: int) -> bool:
             """,
             user_id, gems, mora,
         )
-        # Trả về True nếu Insert/Update thành công (chưa claim hôm nay)
         return result is not None
     except Exception as e:
         print(f"LỖI CLAIM_DAILY: {type(e).__name__}: {e}", flush=True)
         return False
+
+
+# ==========================================
+# CÁC HÀM XỬ LÝ NHÀ TÙ CÔNG ÍCH (JAIL SYSTEM)
+# ==========================================
+
+async def jail_user(user_id: int, target_count: int, original_roles: list[int]):
+    """Đưa user vào tù và lưu lại danh sách role cũ."""
+    if db_pool is None:
+        return
+    try:
+        await _ensure_schema()
+        roles_str = ",".join(map(str, original_roles))
+        await db_pool.execute(
+            """
+            INSERT INTO jail_state(user_id, target_count, done_count, original_roles, jailed_at)
+            VALUES($1, $2, 0, $3, now())
+            ON CONFLICT (user_id) DO UPDATE SET
+                target_count = $2,
+                done_count = 0,
+                original_roles = $3,
+                current_sentence = NULL,
+                jailed_at = now();
+            """,
+            user_id, target_count, roles_str
+        )
+    except Exception as e:
+        print(f"LỖI JAIL_USER: {type(e).__name__}: {e}", flush=True)
+
+
+async def unjail_user(user_id: int):
+    """Xóa user khỏi bảng nhà tù."""
+    if db_pool is None:
+        return
+    try:
+        await _ensure_schema()
+        await db_pool.execute("DELETE FROM jail_state WHERE user_id=$1", user_id)
+    except Exception as e:
+        print(f"LỖI UNJAIL_USER: {type(e).__name__}: {e}", flush=True)
+
+
+async def get_jail_state(user_id: int):
+    """Lấy thông tin tù nhân. Trả về dict hoặc None."""
+    if db_pool is None:
+        return None
+    await _ensure_schema()
+    row = await db_pool.fetchrow("SELECT * FROM jail_state WHERE user_id=$1", user_id)
+    if not row:
+        return None
+    return {
+        "user_id": row["user_id"],
+        "target_count": row["target_count"],
+        "done_count": row["done_count"],
+        "original_roles": [int(r) for r in row["original_roles"].split(",") if r],
+        "current_sentence": row["current_sentence"]
+    }
+
+
+async def set_jail_sentence(user_id: int, sentence: str):
+    """Cập nhật câu chép phạt hiện tại cho tù nhân."""
+    if db_pool is None:
+        return
+    try:
+        await _ensure_schema()
+        await db_pool.execute(
+            "UPDATE jail_state SET current_sentence=$2 WHERE user_id=$1",
+            user_id, sentence
+        )
+    except Exception as e:
+        print(f"LỖI SET_JAIL_SENTENCE: {type(e).__name__}: {e}", flush=True)
+
+
+async def increment_jail_done(user_id: int) -> dict:
+    """Tăng số câu đã chép lên 1 và trả về state mới."""
+    if db_pool is None:
+        return None
+    try:
+        await _ensure_schema()
+        row = await db_pool.fetchrow(
+            """
+            UPDATE jail_state 
+            SET done_count = done_count + 1, current_sentence = NULL 
+            WHERE user_id=$1 
+            RETURNING user_id, target_count, done_count, original_roles;
+            """,
+            user_id
+        )
+        if not row:
+            return None
+        return {
+            "user_id": row["user_id"],
+            "target_count": row["target_count"],
+            "done_count": row["done_count"],
+            "original_roles": [int(r) for r in row["original_roles"].split(",") if r]
+        }
+    except Exception as e:
+        print(f"LỖI INCREMENT_JAIL_DONE: {type(e).__name__}: {e}", flush=True)
+        return None
