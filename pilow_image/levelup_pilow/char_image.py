@@ -12,6 +12,14 @@ from config import (
     LEVEL_SPD_BONUS,
 )
 
+ICON_DIR = Path(__file__).resolve().parent.parent.parent / "assets" / "icon_for_game"
+
+ICON_ATTACK = ICON_DIR / "icon_attack.png"
+ICON_HP = ICON_DIR / "icon_hp.png"
+ICON_SPD = ICON_DIR / "icon_spd.png"
+
+ICON_SIZE = 40
+
 
 # ============================================================
 # BASE CONFIG
@@ -301,12 +309,31 @@ def _box_level(
 # Ô 2: ATK / HP / SPD NẰM NGANG
 # ============================================================
 
+_icon_cache = {}
+
+
+def _get_icon(path: Path) -> Image.Image:
+    """Load + resize icon nhỏ, có cache để không load lại mỗi lần vẽ."""
+    if path in _icon_cache:
+        return _icon_cache[path]
+    try:
+        img = Image.open(path).convert("RGBA").resize(
+            (ICON_SIZE, ICON_SIZE),
+            Image.LANCZOS,
+        )
+    except Exception:
+        img = None
+    _icon_cache[path] = img
+    return img
+
+
 def _draw_stat_pair(
     draw,
     center_x,
     center_y,
     title,
     value,
+    icon_path=None,
 ):
     """
     Vẽ:
@@ -314,7 +341,7 @@ def _draw_stat_pair(
         HP  1200
         SPD 8.5
 
-    Không icon.
+    Kèm icon (nếu có) ở phía trước title.
     """
 
     title_font = get_font(
@@ -357,10 +384,19 @@ def _draw_stat_pair(
         + value_width
     )
 
+    icon = _get_icon(icon_path) if icon_path else None
+    if icon is not None:
+        total_width += ICON_SIZE + 8
+
     start_x = (
         center_x
         - total_width / 2
     )
+
+    # ICON
+    if icon is not None:
+        draw = _paste_icon(draw, icon, start_x, center_y)
+        start_x += ICON_SIZE + 8
 
     # TITLE
     draw_center_vertical(
@@ -383,6 +419,15 @@ def _draw_stat_pair(
         value_font,
         WHITE,
     )
+
+
+def _paste_icon(draw, icon: Image.Image, x_left: float, center_y: int):
+    """Dán icon căn giữa theo chiều dọc vào `center_y`."""
+    img = draw._image
+    paste_x = int(x_left)
+    paste_y = int(center_y - ICON_SIZE / 2)
+    img.paste(icon, (paste_x, paste_y), icon)
+    return draw
 
 
 def _box_stats(
@@ -415,6 +460,7 @@ def _box_stats(
         center_y,
         "ATK",
         f"{atk}",
+        ICON_ATTACK,
     )
 
     # HP
@@ -424,6 +470,7 @@ def _box_stats(
         center_y,
         "HP",
         f"{hp}",
+        ICON_HP,
     )
 
     # SPD
@@ -433,6 +480,7 @@ def _box_stats(
         center_y,
         "SPD",
         f"{spd:.1f}",
+        ICON_SPD,
     )
 
 
