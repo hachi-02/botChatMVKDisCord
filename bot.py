@@ -60,7 +60,7 @@ JAIL_SENTENCES = [
 ]
 
 async def get_or_create_jail_role(guild: discord.Guild) -> discord.Role:
-    """Lấy hoặc tự động tạo Role Tù Nhân."""
+    """Lấy hoặc tự động tạo Role Tù Nhân với quyền ẩn toàn bộ kênh."""
     role = discord.utils.get(guild.roles, name="Tù Nhân - Chép Phạt")
     if not role:
         try:
@@ -69,12 +69,18 @@ async def get_or_create_jail_role(guild: discord.Guild) -> discord.Role:
                 color=discord.Color.dark_gray(),
                 reason="Tạo role tự động cho hệ thống Nhà tù công ích"
             )
-            # Khóa quyền gửi tin nhắn của role này trên tất cả các kênh text
-            for ch in guild.text_channels:
-                if ch.name != "phong-chep-phat":
-                    await ch.set_permissions(role, send_messages=False)
         except Exception as e:
             print(f"LỖI TẠO ROLE JAIL: {e}", flush=True)
+            return None
+
+    # Khóa toàn bộ kênh thường: Ẩn kênh (view_channel=False) & Tắt gửi tin
+    for ch in guild.channels:
+        if ch.name != "phong-chep-phat":
+            try:
+                await ch.set_permissions(role, view_channel=False, send_messages=False)
+            except Exception:
+                pass
+
     return role
 
 
@@ -98,10 +104,25 @@ async def on_ready():
 
 @bot.event
 async def on_member_join(member):
+    # Kiểm tra xem thành viên mới vào có đang thụ án trong Database không (Chống trốn trại)
+    jail_info = await get_jail_state(member.id)
+    if jail_info:
+        jail_role = await get_or_create_jail_role(member.guild)
+        try:
+            # Tự động tháo các role khác và gán lại role Tù nhân
+            roles_to_remove = [r for r in member.roles if not r.is_default() and r != jail_role]
+            if roles_to_remove:
+                await member.remove_roles(*roles_to_remove)
+            if jail_role:
+                await member.add_roles(jail_role)
+            print(f"Phát hiện tù nhân {member.name} quay lại server, đã tái áp đặt án phạt!", flush=True)
+        except Exception as e:
+            print(f"Lỗi khi gán lại role jail cho member join: {e}", flush=True)
+        return
+
+    # Lời chào mừng thành viên mới bình thường
     guild = member.guild
-    channel = discord.utils.get(guild.text_channels, name="chat-chit")
-    if channel is None:
-        channel = guild.system_channel
+    channel = discord.utils.get(guild.text_channels, name="chat-chit") or guild.system_channel
     if channel is None:
         channel = discord.utils.find(
             lambda c: c.permissions_for(guild.me).send_messages,
@@ -126,7 +147,7 @@ async def on_message(message):
         return
 
     # ==========================================
-    # KHIỂM TRA HỆ THỐNG TÙ NHÂN CHÉP PHẠT (JAIL)
+    # KIỂM TRA HỆ THỐNG TÙ NHÂN CHÉP PHẠT (JAIL)
     # ==========================================
     jail_info = await get_jail_state(message.author.id)
     if jail_info:
@@ -261,28 +282,34 @@ async def on_message(message):
             # Đưa vào DB
             await jail_user(target.id, target_count, original_roles)
 
-            # Tạo/lấy role Tù nhân và gán cho user, tháo bớt các role hiện tại
+            # Lấy hoặc tạo Role Tù nhân
             jail_role = await get_or_create_jail_role(message.guild)
-            try:
-                roles_to_remove = [r for r in target.roles if not r.is_default() and r != jail_role]
-                if roles_to_remove:
-                    await target.remove_roles(*roles_to_remove)
-                await target.add_roles(jail_role)
-            except Exception as e:
-                print(f"Lỗi khi tháo/gán role jail: {e}", flush=True)
 
             # Tìm hoặc tạo kênh #phong-chep-phat
             jail_channel = discord.utils.get(message.guild.text_channels, name="phong-chep-phat")
             if not jail_channel:
                 try:
                     overwrites = {
-                        message.guild.default_role: discord.PermissionOverwrite(read_messages=False),
-                        jail_role: discord.PermissionOverwrite(read_messages=True, send_messages=True),
-                        message.guild.me: discord.PermissionOverwrite(read_messages=True, send_messages=True)
+                        message.guild.default_role: discord.PermissionOverwrite(view_channel=False), # Dân thường không thấy phòng tù
+                        jail_role: discord.PermissionOverwrite(view_channel=True, send_messages=True), # Tù nhân thấy và nhắn được
+                        message.guild.me: discord.PermissionOverwrite(view_channel=True, send_messages=True) # Bot thấy
                     }
                     jail_channel = await message.guild.create_text_channel("phong-chep-phat", overwrites=overwrites)
                 except Exception as e:
                     jail_channel = message.channel
+            else:
+                if jail_role:
+                    await jail_channel.set_permissions(jail_role, view_channel=True, send_messages=True)
+
+            # Gán role Tù nhân và tháo các role khác
+            try:
+                roles_to_remove = [r for r in target.roles if not r.is_default() and r != jail_role]
+                if roles_to_remove:
+                    await target.remove_roles(*roles_to_remove)
+                if jail_role:
+                    await target.add_roles(jail_role)
+            except Exception as e:
+                print(f"Lỗi khi tháo/gán role jail: {e}", flush=True)
 
             await message.channel.send(
                 f"🚨 {target.mention} đã bị nhốt vào nhà tù công ích với **{target_count} câu chép phạt**!\n"
