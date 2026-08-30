@@ -5,6 +5,7 @@ from zoneinfo import ZoneInfo
 
 from pilow_image.bag_pilow import create_bag
 from pilow_image.levelup_pilow import create_levelup_card
+from pilow_image.daily_pilow import create_daily_card
 
 from config import (
     POINT_COOLDOWN,
@@ -435,6 +436,19 @@ async def handle_daily(
             uid
         )
 
+        image = await create_daily_card(
+            author=message.author,
+            gems=pts,
+            mora=mora,
+            reward_gems=0,
+            reward_mora=0,
+        )
+
+        file = discord.File(
+            image,
+            filename="daily.png",
+        )
+
         e = discord.Embed(
             title="📅 Điểm danh",
             description=(
@@ -450,20 +464,13 @@ async def handle_daily(
             bot,
         )
 
-        e.add_field(
-            name="Nguyên thạch",
-            value=f"**{pts} 💠**",
-            inline=True,
-        )
-
-        e.add_field(
-            name="Mora",
-            value=f"**{mora} 🪙**",
-            inline=True,
+        e.set_image(
+            url="attachment://daily.png"
         )
 
         await message.channel.send(
             embed=e,
+            file=file,
             reference=message,
             mention_author=False,
         )
@@ -482,6 +489,19 @@ async def handle_daily(
         uid
     )
 
+    image = await create_daily_card(
+        author=message.author,
+        gems=pts,
+        mora=mora,
+        reward_gems=DAILY_GEMS,
+        reward_mora=DAILY_MORA,
+    )
+
+    file = discord.File(
+        image,
+        filename="daily.png",
+    )
+
     e = discord.Embed(
         title="📅 Điểm danh thành công!",
         description=(
@@ -498,20 +518,13 @@ async def handle_daily(
         bot,
     )
 
-    e.add_field(
-        name="Nguyên thạch",
-        value=f"**{pts} 💠**",
-        inline=True,
-    )
-
-    e.add_field(
-        name="Mora",
-        value=f"**{mora} 🪙**",
-        inline=True,
+    e.set_image(
+        url="attachment://daily.png"
     )
 
     await message.channel.send(
         embed=e,
+        file=file,
         reference=message,
         mention_author=False,
     )
