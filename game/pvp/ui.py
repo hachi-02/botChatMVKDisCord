@@ -1,4 +1,5 @@
 import asyncio
+import io
 import random
 
 import discord
@@ -30,6 +31,7 @@ from db import (
     get_rank,
 )
 from pilow_image.pvp_pilow import create_pvp_card
+from pilow_image.levelup_pilow import create_levelup_card_image
 from .cards import (
     get_card,
     element_name,
@@ -845,34 +847,23 @@ def _card_info_embed(card, owned_count, lvl=1):
     return e
 
 
-def _level_up_embed(card, lvl, mora):
+def _level_up_embed(card, lvl, mora, image_bytes=None):
     e = discord.Embed(
-        title=f"⬆️ Nâng cấp {card['name']}",
-        description=f"**Cấp {lvl}/{CHAR_MAX_LEVEL}**\n{_bar(lvl, CHAR_MAX_LEVEL, 15)}",
-        color=PVP_COLOR,
+        title=f"Nâng cấp {card['name']}",
     )
     try:
         e.set_thumbnail(url=card["url"])
     except Exception:
         pass
-    hp, atk, spd = _card_stats(card, lvl)
-    e.add_field(name="❤️ HP", value=f"{hp}", inline=True)
-    e.add_field(name="⚔️ ATK", value=f"{atk}", inline=True)
-    e.add_field(name="💨 SPD", value=f"{spd:.1f}", inline=True)
     e.add_field(
         name="⚡ Tăng mỗi cấp",
         value=f"+{LEVEL_HP_BONUS} HP · +{LEVEL_ATK_BONUS} ATK · +{LEVEL_SPD_BONUS} SPD",
         inline=False,
     )
-    if lvl < CHAR_MAX_LEVEL:
-        cost = LEVEL_COST_PER
-        e.add_field(
-            name="💰 Chi phí",
-            value=f"{cost}🪙 / cấp  ·  Em có **{mora}🪙**",
-            inline=False,
-        )
-    else:
+    if lvl >= CHAR_MAX_LEVEL:
         e.add_field(name="🏆", value="Đã đạt **MAX LEVEL** 🎉", inline=False)
+    if image_bytes is not None:
+        e.set_image(url="attachment://levelup.png")
     return e
 
 
@@ -883,6 +874,7 @@ class LevelUpView(discord.ui.View):
         self.card = card
         self.lvl = lvl
         self.owned_count = owned_count
+        self._level_image = None
         self.mode = "card"
         self._build_card_mode()
 
@@ -909,11 +901,21 @@ class LevelUpView(discord.ui.View):
         self.add_item(self.btn_1)
         self.add_item(self.btn_10)
 
-    async def _refresh(self, interaction, embed):
+    async def _refresh(self, interaction, embed, attachments=None):
         try:
-            await interaction.response.edit_message(embed=embed, view=self)
+            if attachments is not None:
+                await interaction.response.edit_message(
+                    embed=embed, view=self, attachments=attachments
+                )
+            else:
+                await interaction.response.edit_message(embed=embed, view=self)
         except Exception:
             pass
+
+    def _level_attachments(self):
+        img = self._level_image
+        self._level_image = None
+        return [discord.File(img, filename="levelup.png")] if img else []
 
     async def _open_level(self, interaction):
         if interaction.user.id != self.author.id:
@@ -922,7 +924,10 @@ class LevelUpView(discord.ui.View):
         self.mode = "level"
         self._build_level_mode()
         mora = await get_mora(self.author.id)
-        await self._refresh(interaction, _level_up_embed(self.card, self.lvl, mora))
+        img = await create_levelup_card_image(self.card, self.lvl, mora)
+        self._level_image = img
+        embed = _level_up_embed(self.card, self.lvl, mora, img)
+        await self._refresh(interaction, embed, attachments=self._level_attachments())
 
     async def _back(self, interaction):
         if interaction.user.id != self.author.id:
@@ -930,7 +935,11 @@ class LevelUpView(discord.ui.View):
             return
         self.mode = "card"
         self._build_card_mode()
-        await self._refresh(interaction, _card_info_embed(self.card, self.owned_count, self.lvl))
+        await self._refresh(
+            interaction,
+            _card_info_embed(self.card, self.owned_count, self.lvl),
+            attachments=[],
+        )
 
     async def _constellation(self, interaction):
         await _ephemerals.send(interaction, "🔮 Cung mệnh sắp ra mắt, đợi chị nhé 🐟")
@@ -961,7 +970,10 @@ class LevelUpView(discord.ui.View):
         self.lvl = new_lvl
         self._build_level_mode()
         mora = await get_mora(self.author.id)
-        await self._refresh(interaction, _level_up_embed(self.card, self.lvl, mora))
+        img = await create_levelup_card_image(self.card, self.lvl, mora)
+        self._level_image = img
+        embed = _level_up_embed(self.card, self.lvl, mora, img)
+        await self._refresh(interaction, embed, attachments=self._level_attachments())
 
     async def on_timeout(self):
         for item in self.children:
