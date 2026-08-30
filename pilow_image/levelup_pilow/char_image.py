@@ -435,8 +435,8 @@ def _paste_icon(draw, icon: Image.Image, x_left: float, center_y: int):
 def _box_stats(
     draw,
     y,
-    atk,
     hp,
+    atk,
     spd,
 ):
     _rounded_box(
