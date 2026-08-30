@@ -282,24 +282,34 @@ async def on_message(message):
             # 2. Lấy role Jail & Xử lý kênh chép phạt
             jail_role = await get_or_create_jail_role(message.guild)
             jail_channel = discord.utils.get(message.guild.text_channels, name="phong-chep-phat")
+            
+            # Phân quyền chuẩn cho phòng chép phạt: Cấp full quyền xem & đọc phản hồi cho tù nhân
+            jail_overwrites = {
+                message.guild.default_role: discord.PermissionOverwrite(view_channel=False),
+                message.guild.me: discord.PermissionOverwrite(view_channel=True, send_messages=True, read_message_history=True)
+            }
+            if jail_role:
+                jail_overwrites[jail_role] = discord.PermissionOverwrite(
+                    view_channel=True, 
+                    send_messages=True, 
+                    read_message_history=True
+                )
+
             if not jail_channel:
                 try:
-                    overwrites = {
-                        message.guild.default_role: discord.PermissionOverwrite(view_channel=False),
-                        jail_role: discord.PermissionOverwrite(view_channel=True, send_messages=True, read_message_history=True),
-                        message.guild.me: discord.PermissionOverwrite(view_channel=True, send_messages=True)
-                    }
-                    jail_channel = await message.guild.create_text_channel("phong-chep-phat", overwrites=overwrites)
+                    jail_channel = await message.guild.create_text_channel("phong-chep-phat", overwrites=jail_overwrites)
                 except Exception as e:
                     jail_channel = message.channel
             else:
-                # Dọn dẹp tin nhắn cũ để phòng luôn mới tinh
-                try:
-                    await jail_channel.purge(limit=100)
-                except Exception:
-                    pass
+                # Ép lại quyền chuẩn xác cho kênh nếu kênh đã tồn tại
                 if jail_role:
                     await jail_channel.set_permissions(jail_role, view_channel=True, send_messages=True, read_message_history=True)
+
+            # --- DỌN DẸP TIN NHẮN CŨ (RESET PHÒNG CHÉP PHẠT) ---
+            try:
+                await jail_channel.purge(limit=100)
+            except Exception as e:
+                print(f"Lỗi khi dọn dẹp tin nhắn kênh jail: {e}", flush=True)
 
             # 3. Tháo role cũ & Gán role Jail
             try:
@@ -311,7 +321,7 @@ async def on_message(message):
             except Exception as e:
                 print(f"Lỗi khi tháo/gán role jail: {e}", flush=True)
 
-            # 4. Giao câu chép phạt đầu tiên ngay lập tức
+            # 4. Giao câu chép phạt đầu tiên ngay lập tức vào phòng đã dọn sạch
             first_sentence = random.choice(JAIL_SENTENCES)
             await set_jail_sentence(target.id, first_sentence)
             
