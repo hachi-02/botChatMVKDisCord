@@ -13,10 +13,12 @@ from config import (
 )
 
 ICON_DIR = Path(__file__).resolve().parent.parent.parent / "assets" / "icon_for_game"
+IMAGE_ICON_DIR = Path(__file__).resolve().parent.parent.parent / "assets" / "imageIcon"
 
 ICON_ATTACK = ICON_DIR / "icon_attack.png"
 ICON_HP = ICON_DIR / "icon_hp.png"
 ICON_SPD = ICON_DIR / "icon_spd.png"
+ICON_MORA = IMAGE_ICON_DIR / "Item_Mora.webp"
 
 ICON_SIZE = 40
 
@@ -453,24 +455,26 @@ def _box_stats(
     middle_center = 450
     right_center = 730
 
-    # ATK
-    _draw_stat_pair(
-        draw,
-        left_center,
-        center_y,
-        "ATK",
-        f"{atk}",
-        ICON_ATTACK,
-    )
+    
 
     # HP
     _draw_stat_pair(
         draw,
-        middle_center,
+        left_center,
         center_y,
-        "HP",
+        "HP:",
         f"{hp}",
         ICON_HP,
+    )
+
+    # ATK
+    _draw_stat_pair(
+        draw,
+        middle_center,
+        center_y,
+        "ATK:",
+        f"{atk}",
+        ICON_ATTACK,
     )
 
     # SPD
@@ -478,7 +482,7 @@ def _box_stats(
         draw,
         right_center,
         center_y,
-        "SPD",
+        "SPD:",
         f"{spd:.1f}",
         ICON_SPD,
     )
@@ -514,17 +518,35 @@ def _box_money(
         WHITE,
     )
 
-    # MONEY
+    # MONEY (căn phải, có icon mora bên phải số tiền, nằm gọn trong card)
+    money_text = f"{mora:,}"
+    money_font = get_font(34, True)
+    mbox = draw.textbbox((0, 0), money_text, font=money_font)
+    money_width = mbox[2] - mbox[0]
+    edge_right = WIDTH - MARGIN_X - 25
+    icon = _get_icon(ICON_MORA)
+    gap = 8
+    if icon is not None:
+        # Dời số tiền sang trái để nhường chỗ cho icon bên phải, vẫn nằm trong card
+        money_right = edge_right - ICON_SIZE - gap
+    else:
+        money_right = edge_right
     draw_right_center(
         draw,
-        WIDTH
-        - MARGIN_X
-        - 25,
+        money_right,
         center_y,
-        f"{mora:,}",
-        get_font(34, True),
+        money_text,
+        money_font,
         MORA_FILL,
     )
+    if icon is not None:
+        icon_left = money_right + gap
+        _paste_icon(
+            draw,
+            icon,
+            icon_left,
+            center_y,
+        )
 
 
 # ============================================================
@@ -608,8 +630,8 @@ async def create_levelup_card_image(
     _box_stats(
         draw,
         y,
-        atk,
         hp,
+        atk,
         spd,
     )
 
