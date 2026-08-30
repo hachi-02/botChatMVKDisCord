@@ -5,6 +5,7 @@
 # =============================================
 
 import asyncio
+import re
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -16,6 +17,7 @@ from config import (
     IDLE_MAX_PER_DAY,     # Số lần hỏi thăm tối đa mỗi ngày mỗi server
     IDLE_SCAN_LIMIT,      # Số tin tối đa quét khi khởi động
     IDLE_CHANNEL_NAMES,   # Tên kênh để gửi câu hỏi thăm (vd: ["chat-chit"])
+    EMOJI_MAP,            # Placeholder ([HEART]...) -> emoji thật
 )
 from ai import generate_ask   # Sinh câu hỏi thăm ngẫu nhiên qua AI
 
@@ -119,6 +121,11 @@ async def idle_checker(bot):
                     continue
                 if len(text) > 1900:   # Giới hạn độ dài tin nhắn Discord
                     text = text[:1897] + "..."
+
+                # Map placeholder ([MEOW]/[HEART]/[SMILE]/[ANGRY]) thành emoji thật
+                for placeholder, emoji in EMOJI_MAP.items():
+                    text = text.replace(placeholder, emoji)
+                text = re.sub(r"\[(MEOW|HEART|SMILE|ANGRY)\]", "", text)
 
                 await target.send(text)
 
