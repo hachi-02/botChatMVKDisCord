@@ -902,7 +902,7 @@ class LevelUpView(discord.ui.View):
         self.add_item(self.btn_1)
         self.add_item(self.btn_10)
 
-    async def _render_view(self, interaction, embed, attachments=None):
+    async def _edit_levelup(self, interaction, embed, attachments=None):
         try:
             if attachments is not None:
                 await interaction.response.edit_message(
@@ -928,7 +928,7 @@ class LevelUpView(discord.ui.View):
         img = await create_levelup_card_image(self.card, self.lvl, mora)
         self._level_image = img
         embed = _level_up_embed(self.card, self.lvl, mora, img)
-        await self._render_view(interaction, embed, attachments=self._level_attachments())
+        await self._edit_levelup(interaction, embed, attachments=self._level_attachments())
 
     async def _back(self, interaction):
         if interaction.user.id != self.author.id:
@@ -936,7 +936,7 @@ class LevelUpView(discord.ui.View):
             return
         self.mode = "card"
         self._build_card_mode()
-        await self._render_view(
+        await self._edit_levelup(
             interaction,
             _card_info_embed(self.card, self.owned_count, self.lvl),
             attachments=[],
@@ -974,7 +974,7 @@ class LevelUpView(discord.ui.View):
         img = await create_levelup_card_image(self.card, self.lvl, mora)
         self._level_image = img
         embed = _level_up_embed(self.card, self.lvl, mora, img)
-        await self._render_view(interaction, embed, attachments=self._level_attachments())
+        await self._edit_levelup(interaction, embed, attachments=self._level_attachments())
 
     async def on_timeout(self):
         for item in self.children:
