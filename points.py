@@ -459,11 +459,6 @@ async def handle_daily(
             color=EMBED_COLOR,
         )
 
-        _author(
-            e,
-            bot,
-        )
-
         e.set_image(
             url="attachment://daily.png"
         )
@@ -511,11 +506,6 @@ async def handle_daily(
             "Quay lại vào ngày mai để nhận tiếp nhé!"
         ),
         color=EMBED_COLOR,
-    )
-
-    _author(
-        e,
-        bot,
     )
 
     e.set_image(
