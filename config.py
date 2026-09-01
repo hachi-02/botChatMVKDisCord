@@ -120,6 +120,9 @@ IDLE_CHECK_INTERVAL = 60
 IDLE_MAX_PER_DAY = 2
 IDLE_SCAN_LIMIT = 200
 IDLE_CHANNEL_NAMES = ["chat-chit"]
+# Khung giờ cấm bot tự hỏi thăm khi server im (từ 00:00 đến 08:59 = 12h đêm -> 9h sáng)
+IDLE_SILENT_START_HOUR = 0
+IDLE_SILENT_END_HOUR = 9
 
 REPORT_WEEKDAY = 6          # Chủ nhật (Monday=0)
 REPORT_HOUR = 20

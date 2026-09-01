@@ -17,6 +17,8 @@ from config import (
     IDLE_MAX_PER_DAY,     # Số lần hỏi thăm tối đa mỗi ngày mỗi server
     IDLE_SCAN_LIMIT,      # Số tin tối đa quét khi khởi động
     IDLE_CHANNEL_NAMES,   # Tên kênh để gửi câu hỏi thăm (vd: ["chat-chit"])
+    IDLE_SILENT_START_HOUR,  # Giờ bắt đầu khung cấm tự hỏi thăm
+    IDLE_SILENT_END_HOUR,    # Giờ kết thúc khung cấm tự hỏi thăm
     EMOJI_MAP,            # Placeholder ([HEART]...) -> emoji thật
 )
 from ai import generate_ask   # Sinh câu hỏi thăm ngẫu nhiên qua AI
@@ -79,6 +81,12 @@ async def idle_checker(bot):
         try:
             now = datetime.now(ZoneInfo("Asia/Ho_Chi_Minh"))
             today = now.date()
+
+            # Khung giờ cấm: không tự hỏi thăm (12h đêm -> 9h sáng)
+            if IDLE_SILENT_START_HOUR <= now.hour < IDLE_SILENT_END_HOUR:
+                await asyncio.sleep(IDLE_CHECK_INTERVAL)
+                continue
+
             for guild in bot.guilds:
                 last = guild_last_human.get(guild.id)
                 if last is None:
