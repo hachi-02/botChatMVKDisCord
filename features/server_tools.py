@@ -10,7 +10,8 @@ import random
 import discord
 
 from config import HUG_GIFS
-from points import EMBED_COLOR
+
+EMBED_COLOR = 0x1ABC9C
 
 # Bộ emoji số 1-10 dùng để gán cho các lựa chọn trong poll
 NUMBER_EMOJIS = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"]
@@ -31,22 +32,10 @@ MENU_PAGES = [
         [
             ("📊 Vote", "`chica vote Câu hỏi? | chọn 1 | chọn 2`"),
             ("⏰ Nhắc", "`chica remind 7h học bài`"),
-            ("📅 Điểm danh", "`chica daily` (mỗi ngày +10💠 +500🪙)"),
             ("📅 Sự kiện", "`chica make event Tên | thời gian | mô tả | địa điểm`"),
             ("🔗 Lời mời", "`chica link`"),
             ("🎧 Kênh thoại", "`chica voice in` / `chica voice out`"),
             ("🤗 Ôm", "`chica hug @bạn` (tặng cái ôm kèm GIF)"),
-        ],
-    ),
-    (
-        "🎮 Trò chơi & Điểm",
-        [
-            ("💠 Tài sản", "`chica bag` (xem nguyên thạch / mora / cấp)"),
-            ("🎴 Gacha", "`chica gacha` / `chica gacha 1` / `chica gacha 5` (50❖ / 250❖)"),
-            ("🗃️ Kho thẻ", "`chica inventory` (xem các thẻ đã có)"),
-            ("⚔️ PvP", "`chica pvp @người_chơi` (3v3 turn-based, ELO)"),
-            ("🏆 Xếp hạng PvP", "`chica pvp point` / `chica pvp top`"),
-            ("ℹ️ Thông tin thẻ", "`chica info + tên` (vd: `chica info skirk` — xem thẻ đã sở hữu)"),
         ],
     ),
 ]

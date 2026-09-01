@@ -1,36 +1,22 @@
-import asyncio
-import random
 import re
 import time
-from datetime import datetime, timedelta
-from zoneinfo import ZoneInfo
 
 import discord
 
 from config import (
     ROLE_ID,
     KEYWORDS,
-    PVP_RANK_KEYWORDS,
 )
 
 pending_kicks = {}  # user_id -> {"target_id": int, "timestamp": float}
 
-from game.pvp.ui import start_pvp_challenge, handle_pvp_rank, handle_card_info, handle_show_card, is_in_pvp
-from game.pvp.cards import find_card
 from web_server import start_web_server
-from db import (
-    init_db, get_gems, log_message,
-    jail_user, unjail_user, get_jail_state, set_jail_sentence, increment_jail_done
-)
-from points import maybe_award_points, handle_assets, handle_daily
-from gacha.gacha import handle_gacha, handle_collection, GachaView
 from features.scheduler import (
     handle_event_creation,
     handle_remind,
     remind_checker,
     event_reminder_checker,
 )
-from features.activity import note_activity, scan_server_history, idle_checker
 from features.server_tools import (
     handle_menu,
     handle_invite,
@@ -40,7 +26,6 @@ from features.server_tools import (
 )
 from features.chat import handle_chat, handle_summary
 from features.voice import handle_voice_join, handle_voice_leave
-from features.report import weekly_report_checker
 
 intents = discord.Intents.default()
 intents.members = True
@@ -49,40 +34,6 @@ intents.message_content = True
 
 bot = discord.Client(intents=intents)
 
-# Danh sách mẫu các câu chép phạt công ích
-JAIL_SENTENCES = [
-    "Tôi hứa từ nay sẽ chấp hành đúng nội quy server và không vi phạm nữa.",
-    "Tôn trọng thành viên khác là tôn trọng chính bản thân mình.",
-    "Lao động là quang vinh, chép phạt giúp tâm tính bình hòa.",
-    "Chị Cá rất hiền lành nhưng nội quy server thì rất nghiêm túc.",
-    "Tôi sẽ suy nghĩ kỹ trước khi phát ngôn hoặc hành động trên server.",
-    "Một lần bất tín, vạn lần bất tin, tôi sẽ cải tạo tốt để làm lại từ đầu."
-]
-
-async def get_or_create_jail_role(guild: discord.Guild) -> discord.Role:
-    """Lấy hoặc tự động tạo Role Tù Nhân và ép quyền ẩn toàn bộ kênh."""
-    role = discord.utils.get(guild.roles, name="Tù Nhân - Chép Phạt")
-    if not role:
-        try:
-            role = await guild.create_role(
-                name="Tù Nhân - Chép Phạt",
-                color=discord.Color.dark_gray(),
-                reason="Tạo role tự động cho hệ thống Nhà tù công ích"
-            )
-        except Exception as e:
-            print(f"LỖI TẠO ROLE JAIL: {e}", flush=True)
-            return None
-
-    # Khóa toàn bộ kênh trong server: Ẩn kênh (view_channel=False) & Tắt gửi tin
-    for ch in guild.channels:
-        if ch.name != "phong-chep-phat":
-            try:
-                await ch.set_permissions(role, view_channel=False, send_messages=False)
-            except Exception:
-                pass
-
-    return role
-
 
 @bot.event
 async def on_ready():
@@ -90,36 +41,12 @@ async def on_ready():
     await start_web_server()
     bot.loop.create_task(remind_checker(bot))
     bot.loop.create_task(event_reminder_checker(bot))
-    bot.loop.create_task(scan_server_history(bot))
-    bot.loop.create_task(idle_checker(bot))
-    bot.loop.create_task(weekly_report_checker(bot))
-    if not getattr(bot, "_db_inited", False):
-        try:
-            await init_db()
-            bot._db_inited = True
-        except Exception as e:
-            print(f"LỖI INIT DB: {type(e).__name__}: {e}", flush=True)
     print("Chị Cá đã sẵn sàng 🐟", flush=True)
 
 
 @bot.event
 async def on_member_join(member):
-    # Kiểm tra xem thành viên mới vào có đang thụ án trong Database không (Chống trốn trại)
-    jail_info = await get_jail_state(member.id)
-    if jail_info:
-        jail_role = await get_or_create_jail_role(member.guild)
-        try:
-            roles_to_remove = [r for r in member.roles if not r.is_default()]
-            if roles_to_remove:
-                await member.remove_roles(*roles_to_remove)
-            if jail_role:
-                await member.add_roles(jail_role)
-            print(f"Phát hiện tù nhân {member.name} quay lại server, đã tái áp đặt án phạt!", flush=True)
-        except Exception as e:
-            print(f"Lỗi khi gán lại role jail cho member join: {e}", flush=True)
-        return
-
-    # Lời chào mừng thành viên mới bình thường
+    # Lời chào mừng thành viên mới
     guild = member.guild
     channel = discord.utils.get(guild.text_channels, name="chat-chit") or guild.system_channel
     if channel is None:
@@ -145,96 +72,6 @@ async def on_message(message):
     if message.guild is None:
         return
 
-    # ==========================================
-    # KIỂM TRA HỆ THỐNG TÙ NHÂN CHÉP PHẠT (JAIL)
-    # ==========================================
-    jail_info = await get_jail_state(message.author.id)
-    if jail_info:
-        # Kiểm tra xem có đang gửi trong kênh phong-chep-phat hoặc Thread con của kênh này không
-        is_in_jail_channel = (message.channel.name == "phong-chep-phat") or (
-            isinstance(message.channel, discord.Thread) and message.channel.parent and message.channel.parent.name == "phong-chep-phat"
-        )
-
-        if not is_in_jail_channel:
-            try:
-                await message.delete()
-            except Exception:
-                pass
-            return
-
-        current_sentence = jail_info.get("current_sentence")
-
-        # Trường hợp chưa có câu chép phạt -> Giao câu mới
-        if not current_sentence:
-            new_sentence = random.choice(JAIL_SENTENCES)
-            await set_jail_sentence(message.author.id, new_sentence)
-            await message.channel.send(
-                f"⛓️ **TÙ NHÂN {message.author.mention}** [{jail_info['done_count']}/{jail_info['target_count']}]\n"
-                f"Hãy chép lại chính xác câu sau đây để giảm án:\n"
-                f"```\n{new_sentence}\n```"
-            )
-            return
-
-        # Trường hợp đã có câu chép phạt -> Kiểm tra nội dung chép
-        if message.content.strip() == current_sentence.strip():
-            updated = await increment_jail_done(message.author.id)
-            if updated and updated["done_count"] >= updated["target_count"]:
-                # 1. Thông báo chúc mừng trước
-                await message.channel.send(
-                    f"🎉 **ĐÃ HOÀN THÀNH MÃ HẠN TÙ!**\n"
-                    f"Chúc mừng {message.author.mention} đã chép phạt xong **{updated['target_count']}** câu và được khôi phục quyền công dân! Hãy giữ mình nhé 🐟"
-                )
-                
-                await asyncio.sleep(3)
-
-                # 2. Xóa Thread riêng của tù nhân (nếu tin nhắn ở trong Thread)
-                if isinstance(message.channel, discord.Thread):
-                    try:
-                        await message.channel.delete()
-                    except Exception:
-                        pass
-
-                # 3. Xóa khỏi DB & Tháo Role tù nhân
-                await unjail_user(message.author.id)
-                jail_role = discord.utils.get(message.guild.roles, name="Tù Nhân - Chép Phạt")
-                if jail_role and jail_role in message.author.roles:
-                    try:
-                        await message.author.remove_roles(jail_role)
-                    except Exception:
-                        pass
-                
-                # 4. Khôi phục các role cũ
-                roles_to_add = [
-                    message.guild.get_role(rid) 
-                    for rid in updated["original_roles"] 
-                    if message.guild.get_role(rid) is not None
-                ]
-                if roles_to_add:
-                    try:
-                        await message.author.add_roles(*roles_to_add)
-                    except Exception as e:
-                        print(f"Không thể khôi phục role cho {message.author}: {e}", flush=True)
-            else:
-                # Giao tiếp câu tiếp theo
-                next_sentence = random.choice(JAIL_SENTENCES)
-                await set_jail_sentence(message.author.id, next_sentence)
-                await message.channel.send(
-                    f"✅ **Đúng!** Tiến độ: [{updated['done_count']}/{updated['target_count']}]\n"
-                    f"Câu tiếp theo của em:\n```\n{next_sentence}\n```"
-                )
-        else:
-            # Chép sai
-            await message.channel.send(
-                f"❌ Chép sai rồi! Hãy chép lại **chính xác từng ký tự**:\n```\n{current_sentence}\n```"
-            )
-        return
-
-    note_activity(message)
-
-    await log_message(message.author.id, message.channel.id, message.guild.id)
-
-    await maybe_award_points(message, bot)
-
     bot_mentioned = bot.user in message.mentions
 
     role_mentioned = any(role.id == ROLE_ID for role in message.role_mentions)
@@ -254,163 +91,6 @@ async def on_message(message):
         cmdl = cmd.lower()
         tokens = cmd.split()
         t0 = tokens[0].lower() if tokens else ""
-
-        # LỆNH JAIL (NHỐT TÙ CHÉP PHẠT)
-        if t0 == "jail":
-            if not message.author.guild_permissions.administrator:
-                await message.channel.send(
-                    "Chỉ admin mới có quyền nhốt tù công ích nhé 🐟",
-                    reference=message, mention_author=False
-                )
-                return
-
-            if not message.mentions:
-                await message.channel.send(
-                    "Cú pháp: `chica jail @người <số_câu>`\nVí dụ: `chica jail @User 10`",
-                    reference=message, mention_author=False
-                )
-                return
-
-            target = message.mentions[0]
-            if target == bot.user:
-                await message.channel.send("Em không thể nhốt chính em cá nha 🐟", reference=message, mention_author=False)
-                return
-
-            target_count = 5
-            for token in tokens[1:]:
-                if token.isdigit():
-                    target_count = int(token)
-                    break
-
-            # 1. Lưu DB
-            original_roles = [r.id for r in target.roles if not r.is_default()]
-            await jail_user(target.id, target_count, original_roles)
-
-            # 2. Xử lý Kênh & Role
-            jail_role = await get_or_create_jail_role(message.guild)
-            jail_channel = discord.utils.get(message.guild.text_channels, name="phong-chep-phat")
-            
-            jail_overwrites = {
-                message.guild.default_role: discord.PermissionOverwrite(view_channel=False),
-                message.guild.me: discord.PermissionOverwrite(view_channel=True, send_messages=True, read_message_history=True, manage_threads=True)
-            }
-            if jail_role:
-                jail_overwrites[jail_role] = discord.PermissionOverwrite(
-                    view_channel=True, 
-                    send_messages=True, 
-                    read_message_history=True
-                )
-
-            if not jail_channel:
-                try:
-                    jail_channel = await message.guild.create_text_channel("phong-chep-phat", overwrites=jail_overwrites)
-                except Exception as e:
-                    jail_channel = message.channel
-            else:
-                if jail_role:
-                    await jail_channel.set_permissions(jail_role, view_channel=True, send_messages=True, read_message_history=True)
-
-            # 3. Tháo role cũ & Gán role Jail
-            try:
-                roles_to_remove = [r for r in target.roles if not r.is_default()]
-                if roles_to_remove:
-                    await target.remove_roles(*roles_to_remove)
-                if jail_role:
-                    await target.add_roles(jail_role)
-            except Exception as e:
-                print(f"Lỗi khi tháo/gán role jail: {e}", flush=True)
-
-            # 4. Tạo THREAD RIÊNG biệt cho từng tù nhân
-            thread_name = f"🔒-phong-phat-{target.name}"
-            try:
-                jail_thread = await jail_channel.create_thread(
-                    name=thread_name,
-                    type=discord.ChannelType.private_thread if message.guild.premium_tier >= 2 else discord.ChannelType.public_thread
-                )
-                await jail_thread.add_user(target)
-            except Exception as e:
-                print(f"Lỗi tạo thread jail: {e}", flush=True)
-                jail_thread = jail_channel
-
-            # 5. Giao câu chép phạt đầu tiên trong Thread riêng
-            first_sentence = random.choice(JAIL_SENTENCES)
-            await set_jail_sentence(target.id, first_sentence)
-            
-            await jail_thread.send(
-                f"⛓️ **TÙ NHÂN {target.mention}** [0/{target_count}]\n"
-                f"Chào mừng em đến với phòng phạt riêng! Hãy chép lại **chính xác từng ký tự** câu sau đây để giảm án:\n"
-                f"```\n{first_sentence}\n```"
-            )
-
-            # Thông báo cho Admin ở kênh vừa gõ lệnh
-            await message.channel.send(
-                f"🚨 {target.mention} đã bị nhốt vào nhà tù công ích với **{target_count} câu chép phạt**!\n"
-                f"Phòng phạt riêng: {jail_thread.mention}",
-                reference=message, mention_author=False
-            )
-            return
-
-        # LỆNH UNJAIL (THẢ TÙ TRƯỚC THỜI HẠN)
-        if t0 == "unjail":
-            if not message.author.guild_permissions.administrator:
-                await message.channel.send(
-                    "Chỉ admin mới có quyền thả tù trước thời hạn 🐟",
-                    reference=message, mention_author=False
-                )
-                return
-
-            target = None
-            if message.mentions:
-                target = message.mentions[0]
-            else:
-                for token in tokens[1:]:
-                    if token.isdigit():
-                        target = message.guild.get_member(int(token))
-                        if target:
-                            break
-
-            if not target:
-                await message.channel.send(
-                    "Cú pháp: `chica unjail @người` hoặc `chica unjail <User_ID>`",
-                    reference=message, mention_author=False
-                )
-                return
-
-            jail_info = await get_jail_state(target.id)
-            if not jail_info:
-                await message.channel.send(
-                    f"{target.mention} hiện không ở trong tù 🐟",
-                    reference=message, mention_author=False
-                )
-                return
-
-            # Xóa trong DB
-            await unjail_user(target.id)
-
-            # Tháo Role Tù nhân & Trả lại Role cũ
-            jail_role = discord.utils.get(message.guild.roles, name="Tù Nhân - Chép Phạt")
-            if jail_role and jail_role in target.roles:
-                try:
-                    await target.remove_roles(jail_role)
-                except Exception:
-                    pass
-
-            roles_to_add = [
-                message.guild.get_role(rid) 
-                for rid in jail_info["original_roles"] 
-                if message.guild.get_role(rid) is not None
-            ]
-            if roles_to_add:
-                try:
-                    await target.add_roles(*roles_to_add)
-                except Exception as e:
-                    print(f"Lỗi khôi phục role: {e}", flush=True)
-
-            await message.channel.send(
-                f"🔓 {target.mention} đã được Admin đặc xá và thả tự do trước thời hạn!",
-                reference=message, mention_author=False
-            )
-            return
 
         if t0 == "member":
             await handle_member_list(message, bot)
@@ -440,61 +120,12 @@ async def on_message(message):
             await handle_invite(message, bot)
             return
 
-        if t0 == "bag":
-            await handle_assets(message, bot)
-            return
-
-        if t0 == "inventory":
-            await handle_collection(message.channel, message.author, bot)
-            return
-
-        if t0 == "gacha":
-            if is_in_pvp(message.author.id):
-                await message.channel.send(
-                    "Em đang trong trận PvP, xong trận mới quay gacha được nhé 🐟",
-                    reference=message, mention_author=False,
-                )
-                return
-            if "5" in cmdl:
-                n = 5
-            elif "1" in cmdl:
-                n = 1
-            else:
-                n = None
-            if n:
-                await handle_gacha(message.channel, message.author, bot, n)
-            else:
-                pts = await get_gems(message.author.id)
-                view = GachaView(bot, message.author, pts)
-                g_msg = await message.channel.send(view=view)
-                view.message = g_msg
-            return
-
-        if t0 == "show" and (card := find_card(cmd)) is not None:
-            await handle_show_card(message.channel, card)
-            return
-
-        if t0 == "info" and (card := find_card(cmd)) is not None:
-            await handle_card_info(message.channel, message.author, card)
-            return
-
         if t0 == "menu":
             await handle_menu(message, bot)
             return
 
         if t0 == "vote":
             await handle_poll(message, bot)
-            return
-
-        if t0 == "daily":
-            await handle_daily(message, bot)
-            return
-
-        if t0 == "pvp":
-            if any(k in cmdl for k in PVP_RANK_KEYWORDS):
-                await handle_pvp_rank(message, bot)
-            else:
-                await start_pvp_challenge(message, bot)
             return
 
         if cmdl.startswith("voice in") or cmdl == "voicein":

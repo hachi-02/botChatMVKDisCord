@@ -16,7 +16,8 @@ from config import (
     EVENT_REMIND_MINUTES,
     EVENT_DEFAULT_DURATION_MINUTES,
 )
-from points import EMBED_COLOR
+
+EMBED_COLOR = 0x1ABC9C
 
 remind_queue = []   # Hàng đợi các lời nhắc: {user_id, channel_id, time, task}
 event_queue = []    # Hàng đợi các sự kiện: {event_id, name, time, channel_id, notified}
