@@ -11,6 +11,8 @@ from zoneinfo import ZoneInfo
 
 import discord
 
+from pilow_image.report_pilow import create_weekly_report_card
+
 from config import (
     REPORT_WEEKDAY,
     REPORT_HOUR,
@@ -44,41 +46,6 @@ def _week_start(now: datetime) -> datetime:
 
 def _fmt_count(n: int) -> str:
     return f"{n:,}".replace(",", ".")
-
-
-def _build_table(rows) -> str:
-    """Dựng bảng kẻ 2 cột (danh mục | người đứng đầu) kiểu ASCII/unicode."""
-    # rows: [(danh_mục, người_thắng), ...]
-    if not rows:
-        return "| Chưa có dữ liệu |"
-    col_w = max(len(cat) for cat, _ in rows)
-    col_v = max(len(val) for _, val in rows)
-
-    # Giới hạn độ rộng để không tràn màn hình Discord
-    col_w = min(col_w, 22)
-    col_v = min(col_v, 28)
-
-    def trunc(s: str, w: int) -> str:
-        s = s[:w]
-        return s + "…" * (len(s) > w)
-
-    line_top = "┌" + "─" * (col_w + 2) + "┬" + "─" * (col_v + 2) + "┐"
-    line_mid = "├" + "─" * (col_w + 2) + "┼" + "─" * (col_v + 2) + "┤"
-    line_bot = "└" + "─" * (col_w + 2) + "┴" + "─" * (col_v + 2) + "┘"
-
-    def row_line(cat: str, val: str) -> str:
-        return (
-            "│ " + trunc(cat, col_w).ljust(col_w) + " │ "
-            + trunc(val, col_v).ljust(col_v) + " │"
-        )
-
-    out = [line_top, row_line("DANH MỤC", "NGƯỜI ĐỨNG ĐẦU"), line_mid]
-    for i, (cat, val) in enumerate(rows):
-        out.append(row_line(cat, val))
-        if i != len(rows) - 1:
-            out.append(line_mid)
-    out.append(line_bot)
-    return "\n".join(out)
 
 
 def _choose_channel(guild):
@@ -149,25 +116,40 @@ async def generate_weekly_report(bot, guild):
 
     if top_ch:
         channel = guild.get_channel(top_ch["channel_id"])
-        ch_name = channel.mention if channel else f"<#{top_ch['channel_id']}>"
+        if channel is None:
+            try:
+                channel = await bot.fetch_channel(top_ch["channel_id"])
+            except Exception:
+                channel = None
+        if channel is not None:
+            ch_name = channel.mention
+        else:
+            ch_name = "Kênh đã bị xóa"
         rows.append(("💬 Kênh sôi động nhất", f"{ch_name} ({_fmt_count(top_ch['count'])} tin)"))
 
-    table = _build_table(rows)
-
     week_label = start.strftime("%d/%m/%Y")
+
+    image = await create_weekly_report_card(
+        week_label=week_label,
+        guild_name=guild.name,
+        rows=rows,
+    )
+
     e = discord.Embed(
         title="📊 BÁO CÁO THỐNG KÊ TUẦN 🐟",
-        description=f"```\n{table}\n```",
         color=0x9B59B6,
     )
     if bot.user:
         e.set_author(name="Chị Cá 🐟", icon_url=bot.user.display_avatar.url)
+    e.set_image(url="attachment://report.png")
     e.set_footer(text=f"Thống kê từ {week_label} • Chúc em 1 tuần mới vui vẻ 💙")
+
+    file = discord.File(image, filename="report.png")
 
     channel = _choose_channel(guild)
     if channel is None:
         return
-    await channel.send(embed=e)
+    await channel.send(embed=e, file=file)
 
     # Chụp XP hiện tại để tuần sau tính delta + dọn msg_log cũ
     await save_xp_snapshot(guild.id, current_xp)
