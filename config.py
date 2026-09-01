@@ -14,13 +14,11 @@ MODEL_NAME = "qwen/qwen3.8-27b"
 MAX_HISTORY = 15
 
 KEYWORDS = [
-    "chị cá",
-    "chicá",
-    "chị ca",
-    "cá ơi",
-    "ca ơi",
-    "ê chị cá",
-    "chị cá ơi",
+    "chị đại",
+    "chịdại",
+    "đại ơi",
+    "ê chị đại",
+    "chị đại ơi",
 ]
 
 CHUI_KEYWORDS = ["chửi"]

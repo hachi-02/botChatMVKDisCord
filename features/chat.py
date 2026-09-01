@@ -51,11 +51,11 @@ SUMMARY_SYSTEM_PROMPT = (
 )
 
 
-# Xử lý lệnh "tóm tắt" (vd: `chị cá tóm tắt 1 tiếng` / `tóm tắt 30 tin`).
+# Xử lý lệnh "tóm tắt" (vd: `chị đại mavuika tóm tắt 1 tiếng` / `tóm tắt 30 tin`).
 # Lấy lịch sử kênh theo thời gian hoặc số tin, đưa cho AI tóm gọn.
 # Trả về True sau khi xử lý xong (luôn tuân theo route trong bot.py).
 async def handle_summary(message, bot) -> bool:
-    raw = re.sub(r"^(chicha|chica)\s*", "", message.content, flags=re.I).strip()
+    raw = re.sub(r"^mvk\s*", "", message.content, flags=re.I).strip()
     raw = re.sub(r"^(summary|t\u00f3m t\u1eaft)\s*", "", raw, flags=re.I).strip()
 
     now = datetime.now(ZoneInfo("Asia/Ho_Chi_Minh"))
@@ -128,7 +128,7 @@ async def handle_summary(message, bot) -> bool:
     )
     if not transcript.strip():
         await message.channel.send(
-            "Chị không thấy tin nhắn nào trước đó trong kênh này để tóm tắt 🐟",
+            "Chị không thấy tin nhắn nào trước đó trong kênh này để tóm tắt 🔥",
             reference=message, mention_author=False,
         )
         return True
@@ -205,8 +205,8 @@ async def handle_chat(message, bot) -> bool:
 
     prompt = prompt.strip()
 
-    # Bỏ tiền tố lệnh `chica search` để chỉ gửi nội dung tìm kiếm thật cho AI
-    prompt = re.sub(r"(?i)^\s*(chica)\s*search\s*", "", prompt).strip()
+    # Bỏ tiền tố lệnh `mvk search` để chỉ gửi nội dung tìm kiếm thật cho AI
+    prompt = re.sub(r"(?i)^\s*(mvk)\s*search\s*", "", prompt).strip()
 
     sender_name = message.author.display_name or message.author.name
 
@@ -235,7 +235,7 @@ async def handle_chat(message, bot) -> bool:
     # Không còn nội dung gì để gửi AI
     if not prompt:
         await message.channel.send(
-            "M gọi Chị Cá đó hả? 🐟", reference=message, mention_author=False
+            "M gọi Chị Đại Mavuika đó hả? 🔥", reference=message, mention_author=False
         )
         return True
 
@@ -333,15 +333,15 @@ async def handle_chat(message, bot) -> bool:
                 )
             else:
                 await message.channel.send(
-                    "Chị Cá không biết trả lời sao 😅", reference=message, mention_author=False
+                    "Chị Đại Mavuika không biết trả lời sao 😅", reference=message, mention_author=False
                 )
             return True
 
         # Sau khi đã retry hết mà vẫn còn cụt (vd chỉ "M") -> không gửi rác nữa
         if len(answer.strip()) < MIN_SANE_LEN:
-            print(f"⚠️ Vẫn cụt sau {RETRY_MAX} lần thử, không gửi rác 🐟", flush=True)
+            print(f"⚠️ Vẫn cụt sau {RETRY_MAX} lần thử, không gửi rác 🔥", flush=True)
             await message.channel.send(
-                "Chị Cá vừa trả lời bị cụt nên đã loại bỏ, em thử hỏi lại nhé 🐟",
+                "Chị Đại Mavuika vừa trả lời bị cụt nên đã loại bỏ, em thử hỏi lại nhé 🔥",
                 reference=message, mention_author=False,
             )
             return True
@@ -355,6 +355,6 @@ async def handle_chat(message, bot) -> bool:
 
     except Exception as e:
         print(f"LỖI AI: {type(e).__name__}: {e}", flush=True)
-        await message.channel.send("Chị Cá bị lỗi khi gọi AI rồi 😭", reference=message, mention_author=False)
+        await message.channel.send("Chị Đại Mavuika bị lỗi khi gọi AI rồi 😭", reference=message, mention_author=False)
 
     return True

@@ -7,6 +7,6 @@ if not DISCORD_TOKEN:
 if not GROQ_API_KEY:
     raise RuntimeError("Không tìm thấy GROQ_API_KEY trong .env")
 
-print("Đang khởi động Chị Cá...", flush=True)
+print("Đang khởi động Chị Đại Mavuika...", flush=True)
 
 bot.run(DISCORD_TOKEN)

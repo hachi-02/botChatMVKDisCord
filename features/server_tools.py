@@ -21,21 +21,21 @@ MENU_PAGES = [
     (
         "💬 Trò chuyện & Thông tin",
         [
-            ("💬 Nói chuyện", "Gọi `chị cá` hoặc tag chị"),
-            ("🔍 Tìm web", "`chica search <câu hỏi>`"),
-            ("👥 Thành viên online", "`chica member`"),
-            ("🔎 Tóm tắt", "`chica summary 1 tiếng` / `chica summary 30 tin`"),
+            ("💬 Nói chuyện", "Gọi `chị đại` hoặc tag chị"),
+            ("🔍 Tìm web", "`mvk search <câu hỏi>`"),
+            ("👥 Thành viên online", "`mvk member`"),
+            ("🔎 Tóm tắt", "`mvk summary 1 tiếng` / `mvk summary 30 tin`"),
         ],
     ),
     (
         "🛠️ Công cụ Server",
         [
-            ("📊 Vote", "`chica vote Câu hỏi? | chọn 1 | chọn 2`"),
-            ("⏰ Nhắc", "`chica remind 7h học bài`"),
-            ("📅 Sự kiện", "`chica make event Tên | thời gian | mô tả | địa điểm`"),
-            ("🔗 Lời mời", "`chica link`"),
-            ("🎧 Kênh thoại", "`chica voice in` / `chica voice out`"),
-            ("🤗 Ôm", "`chica hug @bạn` (tặng cái ôm kèm GIF)"),
+            ("📊 Vote", "`mvk vote Câu hỏi? | chọn 1 | chọn 2`"),
+            ("⏰ Nhắc", "`mvk remind 7h học bài`"),
+            ("📅 Sự kiện", "`mvk make event Tên | thời gian | mô tả | địa điểm`"),
+            ("🔗 Lời mời", "`mvk link`"),
+            ("🎧 Kênh thoại", "`mvk voice in` / `mvk voice out`"),
+            ("🤗 Ôm", "`mvk hug @bạn` (tặng cái ôm kèm GIF)"),
         ],
     ),
 ]
@@ -44,17 +44,17 @@ MENU_PAGES = [
 # Tạo nội dung text của menu trang `page` (nằm trong TextDisplay của Container).
 def _menu_text(page=0):
     title, items = MENU_PAGES[page]
-    lines = [f"# MENU CHỊ CÁ", "", f"## {title}", ""]
+    lines = [f"# MENU CHỊ ĐẠI MAVUIKA", "", f"## {title}", ""]
     for name, val in items:
         lines.append(f"**{name}** — {val}")
         lines.append("")
     lines.append("")
-    lines.append(f"_Trang {page + 1}/{len(MENU_PAGES)} • Gõ \"chica menu\" để xem lại!_")
+    lines.append(f"_Trang {page + 1}/{len(MENU_PAGES)} • Gõ \"mvk menu\" để xem lại!_")
     return "\n".join(lines)
 
 
 # Giao diện menu Components V2: 2 nút ◀️/▶️ (và nhãn trang) nằm trong cùng 1 Container
-# với phần tiêu đề Menu Chị Cá (tương tự GachaView).
+# với phần tiêu đề Menu Chị Đại Mavuika (tương tự GachaView).
 class MenuView(discord.ui.LayoutView):
     def __init__(self, bot):
         super().__init__(timeout=None)
@@ -132,7 +132,7 @@ def _member_list_embed(message, bot):
     total, online_count = len(members), len(online)
     e = discord.Embed(title="👥 Thành viên online", color=EMBED_COLOR)
     if bot.user:
-        e.set_author(name="Chị Cá 🐟", icon_url=bot.user.display_avatar.url)
+        e.set_author(name="Chị Đại Mavuika 🔥", icon_url=bot.user.display_avatar.url)
     if guild.icon:
         e.set_thumbnail(url=guild.icon.url)
     e.description = f"**{online_count}/{total}** thành viên đang online"
@@ -159,7 +159,7 @@ async def handle_invite(message, bot):
             max_age=604800,   # 7 ngày (604800 giây)
             max_uses=0,       # 0 = không giới hạn số lần dùng
             unique=True,
-            reason="Tạo lời mời bởi Chị Cá",
+            reason="Tạo lời mời bởi Chị Đại Mavuika",
         )
         await message.channel.send(
             f"🔗 Lời mời vào server: {invite.url}\n(Link hiệu lực 7 ngày)",
@@ -175,28 +175,28 @@ async def handle_invite(message, bot):
         )
 
 
-# Xử lý lệnh "ôm" (vd: `chica hug @bạn`). Gửi 1 card (embed) chứa text + GIF.
+# Xử lý lệnh "ôm" (vd: `mvk hug @bạn`). Gửi 1 card (embed) chứa text + GIF.
 # Nếu không có @người nhận thì tự ôm bot.
 async def handle_hug(message, bot) -> bool:
     target = message.mentions[0] if message.mentions else bot.user
     gif = random.choice(HUG_GIFS)
     e = discord.Embed(
-        description=f"{message.author.mention} tặng cái ôm {target.mention} 🐟",
+        description=f"{message.author.mention} tặng cái ôm {target.mention} 🔥",
         color=EMBED_COLOR,
     )
     if bot.user:
-        e.set_author(name="Chị Cá 🐟", icon_url=bot.user.display_avatar.url)
+        e.set_author(name="Chị Đại Mavuika 🔥", icon_url=bot.user.display_avatar.url)
     e.set_image(url=gif)
     await message.channel.send(embed=e, reference=message, mention_author=False)
     return True
 
 
-# Xử lý lệnh vote/poll (vd: `chị cá vote Đi ăn gì? | Phở | Bún`).
+# Xử lý lệnh vote/poll (vd: `chị đại mavuika vote Đi ăn gì? | Phở | Bún`).
 # Tách câu hỏi + các lựa chọn bằng "|" hoặc ";", gắn emoji số để bỏ phiếu.
 async def handle_poll(message, bot) -> bool:
     raw = message.content
-    # Bỏ tiền tố "chị cá/chica" và từ khóa "poll/vote/bầu/bỏ phiếu"
-    raw = re.sub(r"(?i)^(chị\s*cá|chica)\s*", "", raw).strip()
+    # Bỏ tiền tố "chị đại/mvk" và từ khóa "poll/vote/bầu/bỏ phiếu"
+    raw = re.sub(r"(?i)^(chị\s*đại|chịđại|mvk)\s*", "", raw).strip()
     raw = re.sub(r"(?i)^(vote|poll|bầu|bỏ\s*phiếu)\s*", "", raw).strip()
     # Tách thành: câu hỏi + các lựa chọn
     segments = [s.strip() for s in re.split(r"\||;", raw) if s.strip()]
@@ -205,7 +205,7 @@ async def handle_poll(message, bot) -> bool:
     if len(segments) < 3:
         await message.channel.send(
             "Em viết chưa đúng format rồi. "
-            "Gõ: `chica vote Câu hỏi? | chọn 1 | chọn 2` (phân tách bằng `|`) 🐟",
+            "Gõ: `mvk vote Câu hỏi? | chọn 1 | chọn 2` (phân tách bằng `|`) 🔥",
             reference=message, mention_author=False,
         )
         return True
@@ -224,7 +224,7 @@ async def handle_poll(message, bot) -> bool:
         color=EMBED_COLOR,
     )
     if bot.user:
-        e.set_author(name="Chị Cá 🐟", icon_url=bot.user.display_avatar.url)
+        e.set_author(name="Chị Đại Mavuika 🔥", icon_url=bot.user.display_avatar.url)
     e.set_footer(text=f"Bỏ phiếu bằng cách react số tương ứng! • {sender} tạo")
     poll_msg = await message.channel.send(embed=e)
     # Tự động gắn emoji số cho từng lựa chọn để người dùng bấm vote

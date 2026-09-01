@@ -41,7 +41,7 @@ async def on_ready():
     await start_web_server()
     bot.loop.create_task(remind_checker(bot))
     bot.loop.create_task(event_reminder_checker(bot))
-    print("Chị Cá đã sẵn sàng 🐟", flush=True)
+    print("Chị Đại Mavuika đã sẵn sàng 🔥", flush=True)
 
 
 @bot.event
@@ -56,8 +56,8 @@ async def on_member_join(member):
         )
     if channel:
         await channel.send(
-            f"Chào em {member.mention} đến với server! 🐟 "
-            f"Gọi chị Cá nếu cần gì nhé."
+            f"Chào em {member.mention} đến với server! 🔥 "
+            f"Gọi chị đại mavuika nếu cần gì nhé."
         )
 
 
@@ -84,8 +84,8 @@ async def on_message(message):
         or any(kw in content_lower for kw in KEYWORDS)
     )
 
-    # ---- Dispatch lệnh: `chica <lenh>` (thứ tự cứng, chica ở đầu) ----
-    cmd_match = re.match(r"^\s*chica\b\s*(.*)$", content_lower)
+    # ---- Dispatch lệnh: `mvk <lenh>` (thứ tự cứng, mvk ở đầu) ----
+    cmd_match = re.match(r"^\s*mvk\b\s*(.*)$", content_lower)
     if cmd_match:
         cmd = cmd_match.group(1).strip()
         cmdl = cmd.lower()
@@ -139,7 +139,7 @@ async def on_message(message):
         if t0 == "kick":
             if not message.mentions:
                 await message.channel.send(
-                    "Em cần một người để kick nhé 🐟\nDùng: `chica kick @người`",
+                    "Em cần một người để kick nhé 🔥\nDùng: `mvk kick @người`",
                     reference=message, mention_author=False,
                 )
                 return
@@ -150,7 +150,7 @@ async def on_message(message):
             # Không tự kick bot chính
             if target == bot.user:
                 await message.channel.send(
-                    "Em không thể kick chính em cá nha 🐟",
+                    "Em không thể kick chính em cá nha 🔥",
                     reference=message, mention_author=False,
                 )
                 return
@@ -158,7 +158,7 @@ async def on_message(message):
             # Kiểm tra quyền admin
             if not message.author.guild_permissions.administrator:
                 await message.channel.send(
-                    "Chỉ admin mới có quyền kick 🐟",
+                    "Chỉ admin mới có quyền kick 🔥",
                     reference=message, mention_author=False,
                 )
                 return
@@ -166,7 +166,7 @@ async def on_message(message):
             # Kiểm tra role hierarchy: author phải có role cao hơn target
             if target.top_role.position >= author.top_role.position:
                 await message.channel.send(
-                    f"Em không có quyền kick {target.mention} vì role của em thấp hơn hoặc bằng 🐟",
+                    f"Em không có quyền kick {target.mention} vì role của em thấp hơn hoặc bằng 🔥",
                     reference=message, mention_author=False,
                 )
                 return
@@ -186,7 +186,7 @@ async def on_message(message):
             }
             await message.channel.send(
                 f"🔔 {author.mention}, em có muốn kick {target.mention} không?\n"
-                f"Gõ `chica yes` để xác nhận hoặc `chica no` để hủy (hết 30s tự hủy).",
+                f"Gõ `mvk yes` để xác nhận hoặc `mvk no` để hủy (hết 30s tự hủy).",
                 reference=message, mention_author=False,
             )
             return
@@ -198,14 +198,14 @@ async def on_message(message):
                 elapsed = time.time() - data["timestamp"]
                 if elapsed > 30:
                     await message.channel.send(
-                        "⏰ Thời gian chờ hết 30s, lệnh kick đã tự hủy 🐟",
+                        "⏰ Thời gian chờ hết 30s, lệnh kick đã tự hủy 🔥",
                         reference=message, mention_author=False,
                     )
                     return
                 target = discord.utils.get(message.guild.members, id=data["target_id"])
                 if target:
                     try:
-                        await target.kick(reason=f"Kick bởi {message.author.name} (xác nhận via chica yes)")
+                        await target.kick(reason=f"Kick bởi {message.author.name} (xác nhận via mvk yes)")
                         await message.channel.send(
                             f"✅ {target.mention} đã được kick khỏi server!",
                             reference=message, mention_author=False,
@@ -217,12 +217,12 @@ async def on_message(message):
                         )
                 else:
                     await message.channel.send(
-                        "Không tìm thấy người dùng này trong server 🐟",
+                        "Không tìm thấy người dùng này trong server 🔥",
                         reference=message, mention_author=False,
                     )
             else:
                 await message.channel.send(
-                    "Em chưa có lệnh kick nào đang chờ duyệt nhé 🐟",
+                    "Em chưa có lệnh kick nào đang chờ duyệt nhé 🔥",
                     reference=message, mention_author=False,
                 )
             return
@@ -232,12 +232,12 @@ async def on_message(message):
             if message.author.id in pending_kicks:
                 pending_kicks.pop(message.author.id)
                 await message.channel.send(
-                    "🚫 Lệnh kick đã bị hủy nhé 🐟",
+                    "🚫 Lệnh kick đã bị hủy nhé 🔥",
                     reference=message, mention_author=False,
                 )
             else:
                 await message.channel.send(
-                    "Em chưa có lệnh kick nào đang chờ duyệt nhé 🐟",
+                    "Em chưa có lệnh kick nào đang chờ duyệt nhé 🔥",
                     reference=message, mention_author=False,
                 )
             return

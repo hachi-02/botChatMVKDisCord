@@ -27,10 +27,10 @@ event_queue = []    # Hàng đợi các sự kiện: {event_id, name, time, chan
 def _event_help_embed(bot):
     e = discord.Embed(title="📌 Tạo sự kiện", color=EMBED_COLOR)
     if bot.user:
-        e.set_author(name="Chị Cá 🐟", icon_url=bot.user.display_avatar.url)
+        e.set_author(name="Chị Đại Mavuika 🔥", icon_url=bot.user.display_avatar.url)
     e.add_field(
         name="Cú pháp",
-        value="`chica make event Tên | thời gian | mô tả | địa điểm`",
+        value="`mvk make event Tên | thời gian | mô tả | địa điểm`",
         inline=False,
     )
     e.add_field(name="Bắt buộc", value="**Tên** và **thời gian**", inline=True)
@@ -43,8 +43,8 @@ def _event_help_embed(bot):
     )
     e.add_field(
         name="Ví dụ",
-        value="• `chica make event Sinh nhật | ngày mai 20h | mang bánh | voice chung`\n"
-              "• `chica event Offline | 25/12 19h30` 🐟",
+        value="• `mvk make event Sinh nhật | ngày mai 20h | mang bánh | voice chung`\n"
+              "• `mvk event Offline | 25/12 19h30` 🔥",
         inline=False,
     )
     return e
@@ -164,7 +164,7 @@ async def remind_checker(bot):
                     channel = bot.get_channel(r["channel_id"])
                     if channel:
                         await channel.send(
-                            f"{user.mention} Em ơi, chị nhắc nè: **{r['task']}** 🐟",
+                            f"{user.mention} Em ơi, chị nhắc nè: **{r['task']}** 🔥",
                         )
                 except Exception as e:
                     print(f"LỖI REMIND: {e}", flush=True)
@@ -195,7 +195,7 @@ async def event_reminder_checker(bot):
                 if channel:
                     await channel.send(
                         f"🔔 Sự kiện **{e['name']}** sắp bắt đầu trong khoảng "
-                        f"{EVENT_REMIND_MINUTES} phút nữa! (@everyone) 🐟"
+                        f"{EVENT_REMIND_MINUTES} phút nữa! (@everyone) 🔥"
                     )
             event_queue[:] = [e for e in event_queue if e["time"] > now]
         except Exception as e:
@@ -203,12 +203,12 @@ async def event_reminder_checker(bot):
         await asyncio.sleep(30)
 
 
-# Xử lý lệnh "nhắc" (vd: `chị cá nhắc em 7h học bài`).
+# Xử lý lệnh "nhắc" (vd: `chị đại mavuika nhắc em 7h học bài`).
 # Trả về True nếu đã xử lý hết (bot.py dừng lại), False nếu không phải lệnh này.
 async def handle_remind(message, bot) -> bool:
     raw = message.content
-    # Bỏ tiền tố "chị cá"/"chica" và từ "nhắc/remind" để lấy phần thời gian + việc
-    raw = re.sub(r"(?i)^(chị\s*cá|chica)\s*", "", raw).strip()
+    # Bỏ tiền tố "chị đại"/"mvk" và từ "nhắc/remind" để lấy phần thời gian + việc
+    raw = re.sub(r"(?i)^(chị\s*đại|chịđại|mvk)\s*", "", raw).strip()
     raw = re.sub(
         r"(?i)^(nhắc\s*(t|tôi|em|e|tui)|remind)\s*", "", raw
     ).strip()
@@ -220,11 +220,11 @@ async def handle_remind(message, bot) -> bool:
         await message.channel.send(
             "Chị chưa hiểu thời gian em muốn nhắc!\n"
             "**📌 Ví dụ cách dùng:**\n"
-            "• `chica remind 30 phút học bài`->`30 phút đếm ngược`\n"
-            "• `chica remind 1 tiếng học bài`->`1 tiếng đếm ngược`\n"
-            "• `chica remind 7h học bài`->`7:00 giờ cố định`\n"
-            "• `chica remind ngày mai 8h30 dậy`\n"
-            "• `chica remind 25/12 đi chợ`\n\n"
+            "• `mvk remind 30 phút học bài`->`30 phút đếm ngược`\n"
+            "• `mvk remind 1 tiếng học bài`->`1 tiếng đếm ngược`\n"
+            "• `mvk remind 7h học bài`->`7:00 giờ cố định`\n"
+            "• `mvk remind ngày mai 8h30 dậy`\n"
+            "• `mvk remind 25/12 đi chợ`\n\n"
             "💡Chỉ cần nói thời gian + việc cần nhắc là được!",
             reference=message, mention_author=False,
         )
@@ -268,19 +268,19 @@ async def handle_remind(message, bot) -> bool:
         time_str += f"{minutes} phút"
 
     await message.channel.send(
-        f"OK em, {time_str} nữa chị sẽ nhắc: **{task}** 🐟",
+        f"OK em, {time_str} nữa chị sẽ nhắc: **{task}** 🔥",
         reference=message, mention_author=False,
     )
     return True
 
 
-# Xử lý lệnh "tạo sự kiện" (vd: `chị cá tạo sự kiện Sinh nhật | ngày mai 20h | mô tả | địa điểm`).
+# Xử lý lệnh "tạo sự kiện" (vd: `chị đại mavuika tạo sự kiện Sinh nhật | ngày mai 20h | mô tả | địa điểm`).
 # Trả về True nếu đã xử lý hết, False nếu không phải lệnh tạo sự kiện (thiếu "|").
 async def handle_event_creation(message, bot) -> bool:
     raw = message.content
-    # Bỏ tiền tố gọi bot ("chị cá", "chica", ...) và từ khóa "tạo sự kiện"
+    # Bỏ tiền tố gọi bot ("chị đại", "mvk", ...) và từ khóa "tạo sự kiện"
     raw = re.sub(
-        r"(?i)^(chị\s*cá|chica|chicá|chị ca|cá ơi|ca ơi|ê chị cá|ê chica|chị cá ơi|chica ơi)\s*",
+        r"(?i)^(chị\s*đại|chịđại|đại ơi|ê chị đại|chị đại ơi|mvk)\s*",
         "",
         raw,
     ).strip()
@@ -330,7 +330,7 @@ async def handle_event_creation(message, bot) -> bool:
         # Thời gian không hiểu hoặc đã qua -> báo lỗi
         await message.channel.send(
             "Chị chưa hiểu thời gian sự kiện, hoặc thời gian đã qua!\n"
-            "**Ví dụ thời gian:** `ngày mai 20h`, `25/12 19h30`, `7h`, `30 phút nữa` 🐟",
+            "**Ví dụ thời gian:** `ngày mai 20h`, `25/12 19h30`, `7h`, `30 phút nữa` 🔥",
             reference=message, mention_author=False,
         )
         return True
@@ -399,7 +399,7 @@ async def handle_event_creation(message, bot) -> bool:
         color=0x9B59B6,
     )
     if bot.user:
-        e.set_author(name="Chị Cá 🐟", icon_url=bot.user.display_avatar.url)
+        e.set_author(name="Chị Đại Mavuika 🔥", icon_url=bot.user.display_avatar.url)
     e.add_field(
         name="🕒 Bắt đầu",
         value=start_time.strftime("%H:%M %d/%m/%Y"),
@@ -412,7 +412,7 @@ async def handle_event_creation(message, bot) -> bool:
     )
     e.add_field(
         name="🔔 Nhắc",
-        value=f"Chị sẽ nhắc trước {EVENT_REMIND_MINUTES} phút nhé 🐟",
+        value=f"Chị sẽ nhắc trước {EVENT_REMIND_MINUTES} phút nhé 🔥",
         inline=False,
     )
     e.set_footer(text=f"✅ Đã tạo sự kiện • {message.author.display_name} tạo")
